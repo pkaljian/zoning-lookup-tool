@@ -1,0 +1,1128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoning Lookup Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+            font-weight: 300;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .query-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-left: 5px solid #3498db;
+        }
+
+        .query-title {
+            font-size: 1.3em;
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .query-form {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .query-text {
+            font-size: 1.1em;
+            color: #34495e;
+        }
+
+        select {
+            padding: 10px 15px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            min-width: 200px;
+            transition: border-color 0.3s ease;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+
+        button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        }
+
+        .results {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-top: 30px;
+            border: 1px solid #ecf0f1;
+            min-height: 100px;
+        }
+
+        .results h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .result-item {
+            background: #f1f2f6;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #27ae60;
+        }
+
+        .result-item.conditional {
+            border-left-color: #f39c12;
+        }
+
+        .result-item.not-permitted {
+            border-left-color: #e74c3c;
+        }
+
+        .result-item.accessory {
+            border-left-color: #9b59b6;
+        }
+
+        .zone-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .permission-detail {
+            margin-top: 5px;
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        .loading {
+            text-align: center;
+            color: #7f8c8d;
+            font-style: italic;
+        }
+
+        .no-results {
+            text-align: center;
+            color: #e74c3c;
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+            }
+            
+            .query-form {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            select {
+                min-width: auto;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Zoning Lookup Tool</h1>
+        <p class="subtitle">Find zoning permissions for land uses quickly and easily</p>
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; padding: 15px; margin-bottom: 30px; border-left: 5px solid #fdcb6e;">
+            <strong>⚠️ Important Disclaimer:</strong> This tool provides general zoning information for reference purposes only. Always verify requirements with the Planning Department before making final development decisions. Zoning regulations may have additional requirements, recent updates, or site-specific considerations not reflected in this tool.
+            <br><br>
+            <strong>📋 Additional Resources:</strong>
+            <a href="https://cityofpetaluma.org/zoning-map/" target="_blank" style="color: #2980b9; text-decoration: none;">View Official Zoning Map</a> | 
+            <a href="https://petaluma.municipal.codes/SmartCode/2" target="_blank" style="color: #2980b9; text-decoration: none;">View Smart Code and Zoning Code</a>
+        </div>
+
+        <div class="query-section">
+            <div class="query-title">Where can I put a specific use?</div>
+            <div class="query-form">
+                <span class="query-text">Where can I put a</span>
+                <select id="landUseSelect">
+                    <option value="">Select a land use...</option>
+                </select>
+                <span class="query-text">?</span>
+                <button onclick="searchByLandUse()">Find Zones</button>
+            </div>
+        </div>
+<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; margin-top: 15px; font-size: 0.9em; color: #6c757d;">
+    Need help understanding a land use? <a href="https://petaluma.municipal.codes/ZoningOrds/28" target="_blank" style="color: #2980b9; text-decoration: none;">Find land use definitions here</a>
+</div>
+<div style="text-align: center; font-size: 1.2em; color: #7f8c8d; margin: 20px 0;">
+    — OR —
+</div>
+        <div class="query-section">
+            <div class="query-title">What's allowed in a specific zone?</div>
+            <div class="query-form">
+                <span class="query-text">What's allowed in</span>
+                <select id="zoneSelect">
+                    <option value="">Select a zone...</option>
+                </select>
+                <span class="query-text">zoning?</span>
+                <button onclick="searchByZone()">Show Uses</button>
+            </div>
+        </div>
+<div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; margin-top: 15px; font-size: 0.9em; color: #6c757d;">
+    Properties in PUD/PCD zones may have additional requirements. <a href="https://cityofpetaluma.org/pud-and-pcd-guidelines/" target="_blank" style="color: #2980b9; text-decoration: none;">Check specific plan guidelines</a>
+</div>
+        <div class="results" id="results">
+            <p class="loading">Select a query above to get started</p>
+        </div>
+    </div>
+
+    <script>
+        // Test data first to make sure it works
+        const zones = ["OSP", "AG", "RR", "R1", "R2", "R3", "R4", "R5", "MU1A", "MU1B", "MU1C", "MU2", "C1", "C2", "BP", "I", "CF"];
+        
+        const landUses = ["Adult Day Program", "Adult Oriented Business", "Artisan Shop", "Artisan/Craft Product Manufacturing", "ATM", "Auto Parts Sales", "Auto Vehicle Sales and Rental", "Bank, Financial Services", "Bar, Tavern, Night Club", "Building and Landscape Materials Sales Indoor – 25,000 sf or Less", "Building and Landscape Materials Sales Indoor – More Than 25,000 sf", "Building and Landscape Materials Sales – Outdoor", "Business Support Service", "Cardroom", "Catering Service, as a Primary Use", "Child Care Center", "Child Day Care – Large Family", "Child Day Care – Small Family", "City Water and Sewer Facility", "Commercial Recreation – Indoor", "Commercial Recreation – Outdoor", "Community Meeting Facility", "Conference/Convention Facility", "Crop Production, Horticulture, Orchard, Vineyard", "Day Care – Large Family Day Care Home", "Day Care – Small Family Day Care Home", "Dwelling, Accessory", "Dwelling, Caretaker", "Dwelling, Group", "Dwelling, Junior Accessory", "Dwelling, Multiple", "Dwelling, Single Household", "Emergency Shelter", "Farm Animal Keeping", "Fitness/Health Facility", "Fueling Station/Gas Station", "Furniture and Fixture Manufacturing, Cabinet Making", "Furniture and Fixtures Manufacturing, Cabinet Shop", "General Retail – 25,000 sf or Less", "General Retail – More Than 25,000 sf", "General Retail –More Than 25,000 sf", "Golf Course, Country Club", "Groceries/Specialty Foods – 25,000 sf or Less", "Groceries/Specialty Foods – More Than 25,000 sf", "Home Occupation", "Kennel, Animal Boarding", "Laboratory – Cannabis", "Laboratory – Medical, Analytical", "Laundry, Dry Cleaning Plants", "Library, Museum, Art Gallery", "Lodging – Bed and Breakfast Inn", "Lodging – Hotel/Motel", "Lodging – Short-Term Vacation Rentals", "Maintenance/Repair Service – Client Site Services", "Maintenance/Repair Service – Equipment, Appliances", "Manufacturing, Light", "Manufacturing/processing – Cannabis", "Manufacturing/Processing – Light", "Manufacturing/Processing – Medium Intensity", "Meals Assembly Business", "Media Production", "Medical Services – Health Care Facility", "Medical Services – Major", "Medical Services – Minor", "Mortuary, Funeral Home", "Office – Business, Service, or Government", "Office – Government", "Office – Headquarters, or Processing", "Office – Professional, Administrative", "Park", "Parking Facility, Public or Commercial", "Personal Services", "Personal Services – Restricted", "Petroleum Product Storage and Distribution", "Plant Nursery", "Printing and Publishing", "Public Safety Facility", "Recycling Facility", "Recycling Facility – Scrap and Dismantling Yard", "Research and Development", "Residential Care Facility, Adult", "Residential Care Facility, for the Chronically Ill", "Residential Care Facility, for the Elderly", "Residential Care, 6 or Fewer Clients, in a Home", "Residential Care, 7 or More Clients", "Residential Care, Adult", "Residential in Mixed Use Building", "Residential, Accessory Structure", "Restaurant, Café, Coffee Shop", "Retail Sale and Delivery – Cannabis", "School – Elementary, Secondary, or College, Private", "School – Specialized Education and Training", "Sports and Entertainment Assembly", "Storage – Warehouse, Indoor Storage", "Storage Yard – Outdoor", "Studio – Art, Dance, Martial Arts, Music, etc.", "Swimming Pool, Hot Tub, Spa", "Telecommunications Facility", "Theater, Cinema or Performing Arts", "Utility Facility", "Vehicle Services – Major Repair/Body Work", "Vehicle Services – Minor Maintenance/Repair", "Veterinary Clinic, Animal Hospital", "Wholesaling and Distribution", "Work/Live", "Zero Emission Vehicles  (Battery Charging Station)", "Zero Emission Vehicles  (Hydrogen Fuel Cell Station)"];
+
+        const zoningData = {
+            "Adult Day Program": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"CUP","MU1C":"CUP","MU2":"P","C1":"P","C2":"P","BP":"P","I":"Not Permitted","CF":"CUP"},
+            "Adult Oriented Business": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"CUP","MU1C":"Not Permitted","MU2":"CUP","C1":"CUP","C2":"CUP","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Artisan Shop": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Artisan/Craft Product Manufacturing": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"CUP Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"Not Permitted"},
+            "ATM": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"P","MU2":"P","C1":"P","C2":"P","BP":"P","I":"P","CF":"Not Permitted"},
+            "Auto Parts Sales": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Auto Vehicle Sales and Rental": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Bank, Financial Services": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"P","I":"Not Permitted","CF":"Not Permitted"},
+            "Bar, Tavern, Night Club": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"CUP","MU1C":"Not Permitted","MU2":"CUP","C1":"CUP","C2":"CUP","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Building and Landscape Materials Sales Indoor – 25,000 sf or Less": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Building and Landscape Materials Sales Indoor – More Than 25,000 sf": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","MU1B":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","MU1C":"Not Permitted","MU2":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","C1":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","C2":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Building and Landscape Materials Sales – Outdoor": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Business Support Service": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"P","I":"P","CF":"Not Permitted"},
+            "Cardroom": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"CUP","MU1C":"Not Permitted","MU2":"CUP","C1":"CUP","C2":"CUP","BP":"CUP","I":"Not Permitted","CF":"Not Permitted"},
+            "Catering Service, as a Primary Use": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P","MU1C":"Not Permitted","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","BP":"P","I":"P","CF":"Not Permitted"},
+            "Child Care Center": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1C":"Not Permitted","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"P","C2":"P","BP":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","I":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","CF":"P"},
+            "Child Day Care – Large Family": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"A (Business license and compliance with Section 7.060 required.)","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Child Day Care – Small Family": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"A (Business license required.)","MU1B":"A (Business license required.)","MU1C":"A (Business license required.)","MU2":"A (Business license required.)","C1":"A (Business license required.)","C2":"A (Business license required.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "City Water and Sewer Facility": {"OSP":"CUP","AG":"P","RR":"P","R1":"P","R2":"P","R3":"P","R4":"P","R5":"P","MU1A":"P","MU1B":"P","MU1C":"P","MU2":"P","C1":"P","C2":"P","BP":"P","I":"P","CF":"P"},
+            "Commercial Recreation – Indoor": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"CUP","MU1C":"Not Permitted","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"Not Permitted","C2":"CUP","BP":"CUP","I":"Not Permitted","CF":"Not Permitted"},
+            "Commercial Recreation – Outdoor": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"CUP","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Community Meeting Facility": {"OSP":"Not Permitted","AG":"CUP","RR":"CUP","R1":"CUP","R2":"CUP","R3":"CUP","R4":"CUP","R5":"CUP","MU1A":"CUP","MU1B":"CUP","MU1C":"CUP","MU2":"CUP","C1":"P","C2":"P","BP":"CUP","I":"CUP","CF":"CUP"},
+            "Conference/Convention Facility": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"CUP","I":"Not Permitted","CF":"Not Permitted"},
+            "Crop Production, Horticulture, Orchard, Vineyard": {"OSP":"P","AG":"P","RR":"P","R1":"P","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Day Care – Large Family Day Care Home": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"A (Business license and compliance with Section 7.060 required.)","R1":"A (Business license and compliance with Section 7.060 required.)","R2":"A (Business license and compliance with Section 7.060 required.)","R3":"A (Business license and compliance with Section 7.060 required.)","R4":"A (Business license and compliance with Section 7.060 required.)","R5":"A (Business license and compliance with Section 7.060 required.)","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Day Care – Small Family Day Care Home": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"A (Business license required.)","R1":"A (Business license required.)","R2":"A (Business license required.)","R3":"A (Business license required.)","R4":"A (Business license required.)","R5":"A (Business license required.)","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Dwelling, Accessory": {"OSP":"Not Permitted","AG":"A,S","RR":"A,S","R1":"A,S","R2":"A,S","R3":"A,S","R4":"A,S","R5":"A,S","MU1A":"A,S","MU1B":"A,S","MU1C":"A,S","MU2":"A,S","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Dwelling, Caretaker": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"S (Site plan and architectural review required and compliance with Section 7.040 required.)","R3":"S (Site plan and architectural review required and compliance with Section 7.040 required.)","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"P"},
+            "Dwelling, Junior Accessory": {"OSP":"Not Permitted","AG":"A,S","RR":"A,S","R1":"A,S","R2":"A,S","R3":"A,S","R4":"A,S","R5":"A,S","MU1A":"A,S","MU1B":"A,S","MU1C":"A,S","MU2":"A,S","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Dwelling, Multiple": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"P","R3":"P","R4":"P","R5":"P","MU1A":"CUP","MU1B":"CUP","MU1C":"P","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Dwelling, Single Household": {"OSP":"Not Permitted","AG":"P","RR":"P","R1":"P","R2":"A,S (Home occupation permit and business license required.)","R3":"A,S (Home occupation permit and business license required.)","R4":"A,S (Home occupation permit and business license required.)","R5":"A,S (Home occupation permit and business license required.)","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"P","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Emergency Shelter": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"P","CF":"CUP"},
+            "Farm Animal Keeping": {"OSP":"P","AG":"P","RR":"P","R1":"P","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Fitness/Health Facility": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"P","I":"CUP","CF":"Not Permitted"},
+            "Fueling Station/Gas Station": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Furniture and Fixture Manufacturing, Cabinet Making": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"P","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"P","CF":"Not Permitted"},
+            "Furniture and Fixtures Manufacturing, Cabinet Shop": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "General Retail – 25,000 sf or Less": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "General Retail – More Than 25,000 sf": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","MU1B":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","MU1C":"Not Permitted","MU2":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Golf Course, Country Club": {"OSP":"CUP","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Groceries/Specialty Foods – 25,000 sf or Less": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Groceries/Specialty Foods – More Than 25,000 sf": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","MU1B":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","MU1C":"Not Permitted","MU2":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","C1":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","C2":"CUP (To be processed as a major conditional use permit at the discretion of the Planning Commission.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Home Occupation": {"OSP":"Not Permitted","AG":"A,S (Home occupation permit and business license required.)","RR":"A,S (Home occupation permit and business license required.)","R1":"A,S (Home occupation permit and business license required.)","R2":"A","R3":"A","R4":"A","R5":"A","MU1A":"A,S (Home occupation permit and business license required.)","MU1B":"A,S (Home occupation permit and business license required.)","MU1C":"A,S (Home occupation permit and business license required.)","MU2":"A,S (Home occupation permit and business license required.)","C1":"A,S (Home occupation permit and business license required.)","C2":"A,S (Home occupation permit and business license required.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Kennel, Animal Boarding": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"CUP","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"CUP","CF":"Not Permitted"},
+            "Laboratory – Cannabis": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"P (Use must be at least 600 feet from a school or a childcare center, at least 200 feet from parks, youth centers, or the library, and 100 feet from residential districts as measured from property line to property line. ALSO, All cannabis businesses must obtain an annual commercial cannabis permit)","I":"P (Use must be at least 600 feet from a school or a childcare center, at least 200 feet from parks, youth centers, or the library, and 100 feet from residential districts as measured from property line to property line. ALSO, All cannabis businesses must obtain an annual commercial cannabis permit)","CF":"Not Permitted"},
+            "Laboratory – Medical, Analytical": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"P","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"Not Permitted"},
+            "Laundry, Dry Cleaning Plants": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"P","CF":"Not Permitted"},
+            "Library, Museum, Art Gallery": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Lodging – Bed and Breakfast Inn": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"CUP","R2":"CUP","R3":"CUP","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"P","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Lodging – Hotel/Motel": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"Not Permitted","C2":"P","BP":"CUP","I":"Not Permitted","CF":"Not Permitted"},
+            "Lodging – Short-Term Vacation Rentals": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","R1":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","R2":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","R3":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","R4":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","R5":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","MU1A":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","MU1B":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","MU1C":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","MU2":"P (Short-term vacation rental permit, business license and transient occupancy tax certificate required (Section 7.110).)","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Maintenance/Repair Service – Client Site Services": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"Not Permitted"},
+            "Maintenance/Repair Service – Equipment, Appliances": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"P","CF":"Not Permitted"},
+            "Manufacturing, Light": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"P (See Section 21.030 (Non-Residential Uses Abutting Residential Uses).)","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Manufacturing/processing – Cannabis": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"P (Use must be at least 600 feet from a school or a childcare center, at least 200 feet from parks, youth centers, or the library, and 100 feet from residential districts as measured from property line to property line. ALSO, All cannabis businesses must obtain an annual commercial cannabis permit)","I":"P (Use must be at least 600 feet from a school or a childcare center, at least 200 feet from parks, youth centers, or the library, and 100 feet from residential districts as measured from property line to property line. ALSO, All cannabis businesses must obtain an annual commercial cannabis permit)","CF":"Not Permitted"},
+            "Manufacturing/Processing – Light": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"Not Permitted"},
+            "Manufacturing/Processing – Medium Intensity": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"P","CF":"Not Permitted"},
+            "Meals Assembly Business": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Allowed only in a shopping center.)","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"P (Allowed only in a shopping center.)","C2":"P (Allowed only in a shopping center.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Media Production": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P","MU1C":"Not Permitted","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"Not Permitted"},
+            "Medical Services – Health Care Facility": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1C":"Not Permitted","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","BP":"P","I":"Not Permitted","CF":"Not Permitted"},
+            "Medical Services – Major": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"Not Permitted","CF":"Not Permitted"},
+            "Medical Services – Minor": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP. ALSO, Urgent care facilities may be located on the ground floor as a street fronting use.)","MU1B":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP. ALSO, Urgent care facilities may be located on the ground floor as a street fronting use.)","MU1C":"P","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP. ALSO, Urgent care facilities may be located on the ground floor as a street fronting use.)","C1":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP. ALSO, Urgent care facilities may be located on the ground floor as a street fronting use.)","C2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP. ALSO, Urgent care facilities may be located on the ground floor as a street fronting use.)","BP":"P","I":"Not Permitted","CF":"Not Permitted"},
+            "Mortuary, Funeral Home": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Office – Business, Service, or Government": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"P"},
+            "Office – Government": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"P","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"P","C2":"P","BP":"P","I":"Not Permitted","CF":"Not Permitted"},
+            "Office – Headquarters, or Processing": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P","MU1C":"Not Permitted","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","BP":"P","I":"Not Permitted","CF":"Not Permitted"},
+            "Office – Professional, Administrative": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"P","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"P","C2":"P","BP":"P","I":"Not Permitted","CF":"Not Permitted"},
+            "Park": {"OSP":"P","AG":"P","RR":"P","R1":"P","R2":"P","R3":"P","R4":"P","R5":"P","MU1A":"P","MU1B":"P","MU1C":"P","MU2":"P","C1":"P","C2":"P","BP":"P","I":"P","CF":"P"},
+            "Parking Facility, Public or Commercial": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"CUP","C1":"CUP","C2":"CUP","BP":"Not Permitted","I":"Not Permitted","CF":"P"},
+            "Personal Services": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Personal Services – Restricted": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Petroleum Product Storage and Distribution": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"CUP","CF":"Not Permitted"},
+            "Plant Nursery": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"P","C2":"P","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Printing and Publishing": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P","MU1C":"Not Permitted","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"Not Permitted"},
+            "Public Safety Facility": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"P","R1":"P","R2":"P","R3":"P","R4":"P","R5":"P","MU1A":"P","MU1B":"P","MU1C":"P","MU2":"P","C1":"P","C2":"P","BP":"P","I":"P","CF":"P"},
+            "Recycling Facility": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"CUP","I":"CUP","CF":"Not Permitted"},
+            "Recycling Facility – Scrap and Dismantling Yard": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Research and Development": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"P","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"Not Permitted"},
+            "Residential Care Facility, Adult": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1C":"Not Permitted","MU2":"CUP (Allowed only on floors above the ground floor.)","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Residential Care Facility, for the Chronically Ill": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1C":"Not Permitted","MU2":"CUP (Allowed only on floors above the ground floor.)","C1":"CUP (Allowed only on floors above the ground floor.)","C2":"CUP (Allowed only on floors above the ground floor.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Residential Care Facility, for the Elderly": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1C":"Not Permitted","MU2":"CUP (Allowed only on floors above the ground floor.)","C1":"CUP (Allowed only on floors above the ground floor.)","C2":"CUP (Allowed only on floors above the ground floor.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Residential Care, 6 or Fewer Clients, in a Home": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"P","R1":"P","R2":"P","R3":"P","R4":"P","R5":"P","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Residential Care, 7 or More Clients": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Allowed only on floors above the ground floor.)","MU1B":"P (Allowed only on floors above the ground floor.)","MU1C":"P","MU2":"CUP (Allowed only on floors above the ground floor.)","C1":"CUP (Allowed only on floors above the ground floor.)","C2":"CUP (Allowed only on floors above the ground floor.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Residential Care, Adult": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"CUP (Allowed only on floors above the ground floor.)","C2":"CUP (Allowed only on floors above the ground floor.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Residential in Mixed Use Building": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1C":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"P (Allowed only on floors above the ground floor.)","C2":"P (Allowed only on floors above the ground floor.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Residential, Accessory Structure": {"OSP":"Not Permitted","AG":"A","RR":"A","R1":"A","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Restaurant, Café, Coffee Shop": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"CUP","MU2":"P","C1":"P","C2":"P","BP":"P (Neighborhood serving and open at lunch.)","I":"P (Neighborhood serving and open at lunch.)","CF":"Not Permitted"},
+            "Retail Sale and Delivery – Cannabis": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"P (Use must be at least 600 feet from a school or a childcare center, at least 200 feet from parks, youth centers, or the library, and 100 feet from residential districts as measured from property line to property line. ALSO, All cannabis businesses must obtain an annual commercial cannabis permit)","C2":"P (Use must be at least 600 feet from a school or a childcare center, at least 200 feet from parks, youth centers, or the library, and 100 feet from residential districts as measured from property line to property line. ALSO, All cannabis businesses must obtain an annual commercial cannabis permit)","BP":"P (Use must be at least 600 feet from a school or a childcare center, at least 200 feet from parks, youth centers, or the library, and 100 feet from residential districts as measured from property line to property line. ALSO, All cannabis businesses must obtain an annual commercial cannabis permit)","I":"P (Use must be at least 600 feet from a school or a childcare center, at least 200 feet from parks, youth centers, or the library, and 100 feet from residential districts as measured from property line to property line. ALSO, All cannabis businesses must obtain an annual commercial cannabis permit)","CF":"Not Permitted"},
+            "School – Elementary, Secondary, or College, Private": {"OSP":"Not Permitted","AG":"CUP","RR":"CUP","R1":"CUP","R2":"CUP","R3":"CUP","R4":"CUP","R5":"CUP","MU1A":"CUP","MU1B":"CUP","MU1C":"CUP","MU2":"CUP","C1":"Not Permitted","C2":"Not Permitted","BP":"CUP","I":"Not Permitted","CF":"CUP"},
+            "School – Specialized Education and Training": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"CUP","MU1C":"Not Permitted","MU2":"CUP","C1":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","BP":"CUP","I":"Not Permitted","CF":"Not Permitted"},
+            "Sports and Entertainment Assembly": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Storage – Warehouse, Indoor Storage": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"CUP","I":"P","CF":"Not Permitted"},
+            "Storage Yard – Outdoor": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"CUP","CF":"Not Permitted"},
+            "Studio – Art, Dance, Martial Arts, Music, etc.": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P","MU1B":"P","MU1C":"Not Permitted","MU2":"P","C1":"P","C2":"P","BP":"P","I":"Not Permitted","CF":"Not Permitted"},
+            "Swimming Pool, Hot Tub, Spa": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"A,S","R1":"A,S","R2":"A,S","R3":"A,S","R4":"A,S","R5":"A,S","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Telecommunications Facility": {"OSP":"Additional standards in Chapter 7 of the Zoning Code</a>","AG":"Additional standards in Chapter 7 of the Zoning Code","RR":"Additional standards in Chapter 7 of the Zoning Code","R1":"Additional standards in Chapter 7 of the Zoning Code","R2":"Additional standards in Chapter 7 of the Zoning Code","R3":"Additional standards in Chapter 7 of the Zoning Code","R4":"Additional standards in Chapter 7 of the Zoning Code","R5":"Additional standards in Chapter 7 of the Zoning Code","MU1A":"Additional standards in Chapter 7 of the Zoning Code","MU1B":"Additional standards in Chapter 7 of the Zoning Code","MU1C":"Additional standards in Chapter 7 of the Zoning Code","MU2":"Additional standards in Chapter 7 of the Zoning Code","C1":"Additional standards in Chapter 7 of the Zoning Code","C2":"Additional standards in Chapter 7 of the Zoning Code","BP":"Additional standards in Chapter 7 of the Zoning Code","I":"Additional standards in Chapter 7 of the Zoning Code","CF":"Additional standards in Chapter 7 of the Zoning Code"},
+            "Theater, Cinema or Performing Arts": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"CUP","MU1C":"Not Permitted","MU2":"CUP","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"Not Permitted","CF":"CUP"},
+            "Utility Facility": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP","MU1B":"CUP","MU1C":"Not Permitted","MU2":"CUP","C1":"CUP","C2":"CUP","BP":"CUP","I":"CUP","CF":"CUP"},
+            "Vehicle Services – Major Repair/Body Work": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"P","CF":"Not Permitted"},
+            "Vehicle Services – Minor Maintenance/Repair": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"P","MU1C":"Not Permitted","MU2":"CUP","C1":"Not Permitted","C2":"Not Permitted","BP":"Not Permitted","I":"P","CF":"Not Permitted"},
+            "Veterinary Clinic, Animal Hospital": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (A CUP is required for overnight board and care.)","MU1B":"P (A CUP is required for overnight board and care.)","MU1C":"Not Permitted","MU2":"P (A CUP is required for overnight board and care.)","C1":"P (A CUP is required for overnight board and care.)","C2":"P (A CUP is required for overnight board and care.)","BP":"P","I":"P","CF":"Not Permitted"},
+            "Wholesaling and Distribution": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"Not Permitted","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"Not Permitted","C1":"Not Permitted","C2":"Not Permitted","BP":"P","I":"P","CF":"Not Permitted"},
+            "Work/Live": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1B":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","MU1C":"P","MU2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C1":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","C2":"P (Use allowed only on an upper floor or behind a ground floor street fronting use; use in other locations allowed subject to a CUP.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"},
+            "Zero Emission Vehicles  (Battery Charging Station)": {"OSP":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","AG":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","RR":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","R1":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","R2":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","R3":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","R4":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","R5":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","MU1A":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","MU1B":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","MU1C":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","MU2":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","C1":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","C2":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","BP":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","I":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)","CF":"A (Pursuant to Government Code Section 65850.7, this Zoning Ordinance requires no permit for stations.)"},
+            "Zero Emission Vehicles  (Hydrogen Fuel Cell Station)": {"OSP":"Not Permitted","AG":"Not Permitted","RR":"Not Permitted","R1":"Not Permitted","R2":"Not Permitted","R3":"Not Permitted","R4":"Not Permitted","R5":"Not Permitted","MU1A":"CUP (Allowed with CUP when located on site of an existing fueling station/gas station land use.)","MU1B":"Not Permitted","MU1C":"Not Permitted","MU2":"CUP (Allowed with CUP when located on site of an existing fueling station/gas station land use.)","C1":"CUP (Allowed with CUP when located on site of an existing fueling station/gas station land use.)","C2":"CUP (Allowed with CUP when located on site of an existing fueling station/gas station land use.)","BP":"Not Permitted","I":"Not Permitted","CF":"Not Permitted"}
+        };
+
+        // Populate dropdowns
+        function populateDropdowns() {
+            console.log('Populating dropdowns...');
+            const landUseSelect = document.getElementById('landUseSelect');
+            const zoneSelect = document.getElementById('zoneSelect');
+
+            // Test if elements exist
+            if (!landUseSelect) {
+                console.error('landUseSelect not found!');
+                return;
+            }
+            if (!zoneSelect) {
+                console.error('zoneSelect not found!');
+                return;
+            }
+
+            console.log('Adding land uses:', landUses);
+            landUses.forEach(use => {
+                const option = document.createElement('option');
+                option.value = use;
+                option.textContent = use;
+                landUseSelect.appendChild(option);
+            });
+
+            console.log('Adding zones:', zones);
+            zones.forEach(zone => {
+                const option = document.createElement('option');
+                option.value = zone;
+                option.textContent = zone;
+                zoneSelect.appendChild(option);
+            });
+            
+            console.log('Dropdowns populated successfully');
+        }
+
+        function getPermissionClass(permission) {
+            if (permission === "Not Permitted") return "not-permitted";
+            if (permission.startsWith("CUP")) return "conditional";
+            if (permission.startsWith("A")) return "accessory";
+            return "permitted";
+        }
+
+        function searchByLandUse() {
+            const selectedUse = document.getElementById('landUseSelect').value;
+            const results = document.getElementById('results');
+            
+            if (!selectedUse) {
+                results.innerHTML = '<p class="no-results">Please select a land use first.</p>';
+                return;
+            }
+
+            const useData = zoningData[selectedUse];
+            let html = `<h3>Where "${selectedUse}" is allowed:</h3>`;
+            
+            const permitted = [];
+            const conditional = [];
+            const accessory = [];
+            const notPermitted = [];
+
+            Object.entries(useData).forEach(([zone, permission]) => {
+                const item = { zone, permission };
+                
+                if (permission === "Not Permitted") {
+                    notPermitted.push(item);
+                } else if (permission.startsWith("CUP")) {
+                    conditional.push(item);
+                } else if (permission.startsWith("A")) {
+                    accessory.push(item);
+                } else {
+                    permitted.push(item);
+                }
+            });
+
+            if (permitted.length > 0) {
+                html += '<h4 style="color: #27ae60; margin-top: 20px;">Permitted:</h4>';
+                permitted.forEach(item => {
+                    html += `<div class="result-item permitted">
+                        <span class="zone-name">${item.zone}</span>
+                        <div class="permission-detail">${item.permission}</div>
+                    </div>`;
+                });
+            }
+
+            if (conditional.length > 0) {
+                html += '<h4 style="color: #f39c12; margin-top: 20px;">Conditional Use Permit Required:</h4>';
+                conditional.forEach(item => {
+                    html += `<div class="result-item conditional">
+                        <span class="zone-name">${item.zone}</span>
+                        <div class="permission-detail">${item.permission}</div>
+                    </div>`;
+                });
+            }
+
+            if (accessory.length > 0) {
+                html += '<h4 style="color: #9b59b6; margin-top: 20px;">Accessory Use:</h4>';
+                accessory.forEach(item => {
+                    html += `<div class="result-item accessory">
+                        <span class="zone-name">${item.zone}</span>
+                        <div class="permission-detail">${item.permission}</div>
+                    </div>`;
+                });
+            }
+
+            results.innerHTML = html;
+        }
+
+        function searchByZone() {
+            const selectedZone = document.getElementById('zoneSelect').value;
+            const results = document.getElementById('results');
+            
+            if (!selectedZone) {
+                results.innerHTML = '<p class="no-results">Please select a zone first.</p>';
+                return;
+            }
+
+            let html = `<h3>What's allowed in ${selectedZone} zoning:</h3>`;
+            
+            const permitted = [];
+            const conditional = [];
+            const accessory = [];
+
+            Object.entries(zoningData).forEach(([landUse, zones]) => {
+                const permission = zones[selectedZone];
+                if (permission && permission !== "Not Permitted") {
+                    const item = { landUse, permission };
+                    
+                    if (permission.startsWith("CUP")) {
+                        conditional.push(item);
+                    } else if (permission.startsWith("A")) {
+                        accessory.push(item);
+                    } else {
+                        permitted.push(item);
+                    }
+                }
+            });
+
+            if (permitted.length > 0) {
+                html += '<h4 style="color: #27ae60; margin-top: 20px;">Permitted Uses:</h4>';
+                permitted.forEach(item => {
+                    html += `<div class="result-item permitted">
+                        <span class="zone-name">${item.landUse}</span>
+                        <div class="permission-detail">${item.permission}</div>
+                    </div>`;
+                });
+            }
+
+            if (conditional.length > 0) {
+                html += '<h4 style="color: #f39c12; margin-top: 20px;">Conditional Use Permit Required:</h4>';
+                conditional.forEach(item => {
+                    html += `<div class="result-item conditional">
+                        <span class="zone-name">${item.landUse}</span>
+                        <div class="permission-detail">${item.permission}</div>
+                    </div>`;
+                });
+            }
+
+            if (accessory.length > 0) {
+                html += '<h4 style="color: #9b59b6; margin-top: 20px;">Accessory Uses:</h4>';
+                accessory.forEach(item => {
+                    html += `<div class="result-item accessory">
+                        <span class="zone-name">${item.landUse}</span>
+                        <div class="permission-detail">${item.permission}</div>
+                    </div>`;
+                });
+            }
+
+            if (permitted.length === 0 && conditional.length === 0 && accessory.length === 0) {
+                html += '<p class="no-results">No uses are specifically allowed in this zone.</p>';
+            }
+
+            results.innerHTML = html;
+        }
+
+        // Initialize the page when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, initializing...');
+            populateDropdowns();
+        });
+    </script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoning Permit Decision Tool</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.2em;
+            margin-bottom: 10px;
+            font-weight: 300;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .question-container {
+            background: #f8f9ff;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 25px;
+            border-left: 5px solid #667eea;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .question {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+
+        .context {
+            font-size: 0.95em;
+            color: #666;
+            margin-bottom: 25px;
+            font-style: italic;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 120px;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .result {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            padding: 25px;
+            border-radius: 12px;
+            margin-top: 20px;
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .result h3 {
+            font-size: 1.4em;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .result p {
+            font-size: 1.1em;
+            line-height: 1.7;
+        }
+
+        .breadcrumb {
+            background: #e8f4fd;
+            padding: 15px 25px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            color: #2c3e50;
+        }
+
+        .breadcrumb strong {
+            color: #3498db;
+        }
+
+        .restart-btn {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            margin-top: 20px;
+        }
+
+        .restart-btn:hover {
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+        }
+
+        .back-btn {
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            min-width: 90px;
+            box-shadow: 0 4px 15px rgba(149, 165, 166, 0.3);
+        }
+
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(149, 165, 166, 0.4);
+        }
+
+        .back-btn:active {
+            transform: translateY(0);
+        }
+
+        .progress-bar {
+            height: 4px;
+            background: #ecf0f1;
+            margin-bottom: 20px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+
+        .code-section {
+            background: #2c3e50;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+
+        @media (max-width: 600px) {
+            .content {
+                padding: 20px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Zoning Permit Decision Tool</h1>
+            <p>Interactive guide to determine required permits and review processes</p>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressBar"></div>
+        </div>
+
+        <div class="content" id="content">
+            <!-- Content will be dynamically generated -->
+        </div>
+    </div>
+
+    <script>
+        class ZoningDecisionTool {
+            constructor() {
+                this.currentStep = 'start';
+                this.breadcrumb = [];
+                this.stepHistory = ['start'];
+                this.totalSteps = 0;
+                this.currentStepNumber = 0;
+                this.init();
+            }
+
+            init() {
+                this.renderStep();
+            }
+
+            updateProgress() {
+                const progressBar = document.getElementById('progressBar');
+                const progress = this.totalSteps > 0 ? (this.currentStepNumber / this.totalSteps) * 100 : 0;
+                progressBar.style.width = progress + '%';
+            }
+
+            renderStep() {
+                const content = document.getElementById('content');
+                const stepData = this.getStepData(this.currentStep);
+                
+                this.updateProgress();
+                
+                let html = '';
+                
+                if (this.breadcrumb.length > 0) {
+                    html += `<div class="breadcrumb">
+                        <strong>Path:</strong> ${this.breadcrumb.join(' → ')}
+                    </div>`;
+                }
+
+                if (stepData.type === 'question') {
+                    html += `
+                        <div class="question-container">
+                            <div class="question">
+                                ${stepData.question}
+                                ${stepData.codeSection ? `<span class="code-section">${stepData.codeSection}</span>` : ''}
+                            </div>
+                            ${stepData.context ? `<div class="context">${stepData.context}</div>` : ''}
+                            <div class="button-group">
+                                ${stepData.options.map(option => 
+                                    `<button onclick="tool.handleAnswer('${option.value}')">${option.text}</button>`
+                                ).join('')}
+                            </div>
+                            ${this.stepHistory.length > 1 ? `
+                                <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+                                    <button class="back-btn" onclick="tool.goBack()">← Back</button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                } else if (stepData.type === 'result') {
+                    html += `
+                        <div class="result">
+                            <h3>
+                                🎯 ${stepData.title}
+                                ${stepData.codeSection ? `<span class="code-section">${stepData.codeSection}</span>` : ''}
+                            </h3>
+                            <p>${stepData.description}</p>
+                            <div style="display: flex; gap: 15px; margin-top: 20px;">
+                                <button class="restart-btn" onclick="tool.restart()">🔄 Start Over</button>
+                                ${this.stepHistory.length > 1 ? `
+                                    <button class="back-btn" onclick="tool.goBack()">← Back</button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                content.innerHTML = html;
+            }
+
+            handleAnswer(value) {
+                const stepData = this.getStepData(this.currentStep);
+                const selectedOption = stepData.options.find(opt => opt.value === value);
+                
+                if (selectedOption) {
+                    this.breadcrumb.push(selectedOption.text);
+                    this.currentStep = selectedOption.next;
+                    this.stepHistory.push(this.currentStep);
+                    this.currentStepNumber++;
+                    this.renderStep();
+                }
+            }
+
+            goBack() {
+                if (this.stepHistory.length > 1) {
+                    this.stepHistory.pop();
+                    this.currentStep = this.stepHistory[this.stepHistory.length - 1];
+                    this.breadcrumb.pop();
+                    this.currentStepNumber = Math.max(0, this.currentStepNumber - 1);
+                    this.renderStep();
+                }
+            }
+
+            restart() {
+                this.currentStep = 'start';
+                this.breadcrumb = [];
+                this.stepHistory = ['start'];
+                this.currentStepNumber = 0;
+                this.renderStep();
+            }
+
+            getStepData(step) {
+                const steps = {
+                    'start': {
+                        type: 'question',
+                        question: 'Is the use allowed in this zone?',
+                        context: 'Check if use table shows anything other than "Not Permitted"',
+                        options: [
+                            { text: 'Yes - Use is allowed in some form', value: 'check_accessory', next: 'check_accessory' },
+                            { text: 'No - Shows "Not Permitted"', value: 'not_permitted', next: 'not_permitted' }
+                        ]
+                    },
+
+                    'not_permitted': {
+                        type: 'result',
+                        title: 'Use Not Permitted',
+                        description: 'The City\'s General Plan and zoning ordinance do not permit this use in that zone. You would need to pursue a General Plan amendment and/or zone change, which is a separate legislative process.'
+                    },
+
+                    'check_accessory': {
+                        type: 'question',
+                        question: 'Is this an accessory use?',
+                        context: 'Does the use table show "A" (Accessory use)?',
+                        options: [
+                            { text: 'Yes - Accessory use', value: 'accessory_check', next: 'accessory_check' },
+                            { text: 'No - Not accessory', value: 'check_standards', next: 'check_standards' }
+                        ]
+                    },
+
+                    'accessory_check': {
+                        type: 'question',
+                        question: 'Can use be demonstrated as secondary to primary use?',
+                        options: [
+                            { text: 'Yes - Secondary to primary use', value: 'administrative', next: 'administrative' },
+                            { text: 'No - Cannot demonstrate secondary relationship', value: 'not_permitted', next: 'not_permitted' }
+                        ]
+                    },
+
+                    'check_standards': {
+                        type: 'question',
+                        question: 'Does development meet ALL zoning standards?',
+                        context: 'Setbacks, height, parking, lot coverage, etc.',
+                        options: [
+                            { text: 'Yes - Meets all standards', value: 'check_use_type', next: 'check_use_type' },
+                            { text: 'No - Does not meet standards', value: 'check_variance', next: 'check_variance' }
+                        ]
+                    },
+
+                    'check_variance': {
+                        type: 'question',
+                        question: 'Are there exceptional property conditions?',
+                        context: 'Exceptional narrowness, shallowness, or unusual shape',
+                        options: [
+                            { text: 'Yes - Exceptional property conditions', value: 'variance', next: 'variance' },
+                            { text: 'No - Standard property conditions', value: 'not_permitted', next: 'not_permitted' }
+                        ]
+                    },
+
+                    'check_use_type': {
+                        type: 'question',
+                        question: 'What does the use table show?',
+                        options: [
+                            { text: 'P - Permitted', value: 'check_spar', next: 'check_spar' },
+                            { text: 'CUP - Conditional Use Permit', value: 'cup', next: 'cup' },
+                            { text: 'S - Specific Use Regulations', value: 'check_chapter7', next: 'check_chapter7' }
+                        ]
+                    },
+
+                    'check_chapter7': {
+                        type: 'question',
+                        question: 'Does the use meet all standards outlined in Chapter 7?',
+                        context: 'Check the specific use regulations referenced in the use table. Use the Zoning Lookup Tool to find detailed Chapter 7 requirements for your specific use.',
+                        options: [
+                            { text: 'Yes - Meets all Chapter 7 standards', value: 'specific_regs_compliant', next: 'specific_regs_compliant' },
+                            { text: 'No - Does not meet standards', value: 'zoning_compliance_required', next: 'zoning_compliance_required' }
+                        ]
+                    },
+
+                    'check_spar': {
+                        type: 'question',
+                        question: 'Does this project require SPAR?',
+                        codeSection: 'Section 24.050',
+                        context: 'Is use specifically listed in Section 24.050.A? (Public buildings, schools, hospitals, churches, clubs, motels, offices, commercial, industrial, mobile home parks, parking lots, utilities, multi-family, subdivision resulting in 5 or more parcels)',
+                        options: [
+                            { text: 'Yes - Listed in 24.050.A', value: 'spar_type', next: 'spar_type' },
+                            { text: 'No - Not listed', value: 'permitted_no_spar', next: 'permitted_no_spar' }
+                        ]
+                    },
+
+                    'permitted_no_spar': {
+                        type: 'result',
+                        title: 'Permitted by Right - No Planning Permit Required',
+                        description: 'This use is permitted by right and does not require SPAR or other planning permits. You may proceed with building permits or other ministerial approvals as needed.'
+                    },
+
+                    'spar_type': {
+                        type: 'question',
+                        question: 'What type of SPAR is required?',
+                        codeSection: 'Section 24.050',
+                        options: [
+                            { text: 'Nonproduction residential in approved subdivision (≥5 lots)', value: 'admin_spar', next: 'admin_spar' },
+                            { text: 'Residential development <5 units', value: 'admin_spar', next: 'admin_spar' },
+                            { text: 'Minor addition to commercial/industrial/office', value: 'admin_spar_option', next: 'admin_spar_option' },
+                            { text: 'Other SPAR-required project', value: 'pc_spar', next: 'pc_spar' }
+                        ]
+                    },
+
+                    'admin_spar_option': {
+                        type: 'question',
+                        question: 'Does Director choose to handle administratively?',
+                        options: [
+                            { text: 'Yes - Administrative review', value: 'admin_spar', next: 'admin_spar' },
+                            { text: 'No - Planning Commission review', value: 'pc_spar', next: 'pc_spar' }
+                        ]
+                    },
+
+                    'admin_spar': {
+                        type: 'result',
+                        title: 'Administrative SPAR Required',
+                        codeSection: 'Section 24.050',
+                        description: 'This project requires Site Plan and Architectural Review by the Director. This is a discretionary review with required findings, but no public hearing is required.'
+                    },
+
+                    'pc_spar': {
+                        type: 'result',
+                        title: 'Planning Commission SPAR Required',
+                        codeSection: 'Section 24.050',
+                        description: 'This project requires Site Plan and Architectural Review by the Planning Commission. This involves a public hearing with discretionary findings and public notice requirements.'
+                    },
+
+                    'cup': {
+                        type: 'question',
+                        question: 'What type of Conditional Use Permit is needed?',
+                        codeSection: 'Section 24.060',
+                        options: [
+                            { text: 'Minor modification to existing CUP', value: 'minor_cup', next: 'minor_cup' },
+                            { text: 'Less intensive use than previous occupant', value: 'minor_cup', next: 'minor_cup' },
+                            { text: 'Dwelling groups, tasting rooms, or other minor CUP types', value: 'minor_cup', next: 'minor_cup' },
+                            { text: 'Standard conditional use', value: 'standard_cup', next: 'standard_cup' }
+                        ]
+                    },
+
+                    'minor_cup': {
+                        type: 'result',
+                        title: 'Minor Use Permit Required',
+                        codeSection: 'Section 24.060',
+                        description: 'This project qualifies for a Minor Use Permit, which can be approved administratively by the Director. Same findings as standard CUP but no public hearing required.'
+                    },
+
+                    'standard_cup': {
+                        type: 'result',
+                        title: 'Standard Conditional Use Permit Required',
+                        codeSection: 'Section 24.060',
+                        description: 'This project requires a standard Conditional Use Permit reviewed by the Planning Commission. This involves a public hearing with required findings and public notice requirements.'
+                    },
+
+                    'variance': {
+                        type: 'question',
+                        question: 'What type of variance review?',
+                        codeSection: 'Section 24.070',
+                        context: 'All required findings must be met: peculiar property conditions, hardship not created by owner, necessary for substantial property rights, no detriment to adjacent properties',
+                        options: [
+                            { text: 'Director chooses administrative review', value: 'admin_variance', next: 'admin_variance' },
+                            { text: 'Planning Commission review', value: 'pc_variance', next: 'pc_variance' }
+                        ]
+                    },
+
+                    'admin_variance': {
+                        type: 'result',
+                        title: 'Administrative Variance',
+                        codeSection: 'Section 24.070',
+                        description: 'This variance can be reviewed administratively by the Director. All variance findings must still be met, but no public hearing is required.'
+                    },
+
+                    'pc_variance': {
+                        type: 'result',
+                        title: 'Planning Commission Variance',
+                        codeSection: 'Section 24.070',
+                        description: 'This variance requires Planning Commission review with a public hearing. All required variance findings must be met with substantial evidence.'
+                    },
+
+                    'specific_regs_compliant': {
+                        type: 'result',
+                        title: 'Specific Use Regulations - Compliant',
+                        description: 'This use meets the specific use regulations in Chapter 7. Since it complies with all standards, no additional planning permits are required. You may proceed with building permits or other ministerial approvals as needed.'
+                    },
+
+                    'zoning_compliance_required': {
+                        type: 'result',
+                        title: 'Zoning Compliance Required First',
+                        description: 'This use must comply with specific use regulations in Chapter 7 before proceeding. Use the Zoning Lookup Tool to find the detailed requirements for your specific use, then work with planning staff to achieve compliance.'
+                    },
+
+                    'administrative': {
+                        type: 'question',
+                        question: 'What type of administrative permit?',
+                        codeSection: 'Section 24.030',
+                        options: [
+                            { text: 'Business license', value: 'business_license', next: 'business_license' },
+                            { text: 'Home occupation permit', value: 'home_occupation', next: 'home_occupation' },
+                            { text: 'Short-term vacation rental', value: 'str_permit', next: 'str_permit' },
+                            { text: 'State housing law (SB 9, etc.)', value: 'state_housing', next: 'state_housing' },
+                            { text: 'Other ministerial permit', value: 'other_ministerial', next: 'other_ministerial' }
+                        ]
+                    },
+
+                    'business_license': {
+                        type: 'result',
+                        title: 'Business License Required',
+                        description: 'Business license review process (handled by Finance Department). Zoning compliance must be verified first.'
+                    },
+
+                    'home_occupation': {
+                        type: 'result',
+                        title: 'Home Occupation Permit Required',
+                        description: 'Home occupation permit review process. Must meet Section 7.060 compliance standards.'
+                    },
+
+                    'str_permit': {
+                        type: 'result',
+                        title: 'Short-Term Vacation Rental Permit',
+                        description: 'STR permit review process. Must meet Section 7.110 requirements including business license and transient occupancy tax certificate.'
+                    },
+
+                    'state_housing': {
+                        type: 'result',
+                        title: 'State Housing Law - Ministerial Approval',
+                        description: 'Ministerial approval per state law (SB 9 or other qualifying legislation). Must meet objective standards as defined by state law.'
+                    },
+
+                    'other_ministerial': {
+                        type: 'result',
+                        title: 'Other Ministerial Permit',
+                        description: 'Administrative determination based on objective standards. No discretionary findings required.'
+                    }
+                };
+
+                if (this.totalSteps === 0) {
+                    this.totalSteps = Object.keys(steps).filter(key => steps[key].type === 'question').length;
+                }
+
+                return steps[step] || steps['start'];
+            }
+        }
+
+        const tool = new ZoningDecisionTool();
+    </script>
+</body>
+</html>
+</body>
+</html>
