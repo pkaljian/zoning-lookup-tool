@@ -178,6 +178,47 @@
         }
     </style>
 <script src="ZoningData_not_permitted.js"></script>
+    <script>
+(function () {
+  // Optional: your old manual lists as a safety net
+  const DEFAULT_LAND_USES = []; // you can leave empty or paste your current list
+  const DEFAULT_ZONES = [];     // same here
+
+  // 1) Get data if present
+  const data = (window.zoningData && typeof window.zoningData === 'object') ? window.zoningData : null;
+
+  // 2) Build lists (or fall back)
+  const landUses = data
+    ? Object.keys(data).sort()
+    : DEFAULT_LAND_USES;
+
+  const zones = data
+    ? Array.from(new Set(Object.values(data).flatMap(row => Object.keys(row || {}))))
+        .filter(Boolean)
+        .sort()
+    : DEFAULT_ZONES;
+
+  // 3) Fill a <select> safely
+  function fillSelect(id, items) {
+    const el = document.getElementById(id);
+    if (!el) return; // don’t crash if ID is missing
+    el.innerHTML = '<option value="">— Select —</option>';
+    for (const item of items) {
+      const opt = document.createElement('option');
+      opt.value = item;
+      opt.textContent = item;
+      el.appendChild(opt);
+    }
+  }
+
+  // 4) Populate on DOM ready
+  window.addEventListener('DOMContentLoaded', function () {
+    fillSelect('landUseSelect', landUses);
+    fillSelect('zoneSelect', zones);
+  });
+})();
+</script>
+
 </head>
 <body>
     <div class="container">
