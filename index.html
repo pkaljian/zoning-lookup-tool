@@ -161,6 +161,14 @@
             font-style: italic;
         }
 
+           .definition-banner {
+  background: #fffbe7;
+  border: 1px solid #ffd75a;
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
         @media (max-width: 768px) {
             .container {
                 padding: 20px;
@@ -170,7 +178,7 @@
                 flex-direction: column;
                 align-items: stretch;
             }
-            
+
             select {
                 min-width: auto;
                 width: 100%;
@@ -178,6 +186,7 @@
         }
     </style>
 <script src="ZoningData_not_permitted.js"></script>
+      <script src="UseDefinitions.js"></script>
     <script>
 (function () {
   // Optional: your old manual lists as a safety net
@@ -268,6 +277,17 @@
         </div>
     </div>
 <script src="zoningData.js"></script>
+    function getDefinition(useName) {
+  return (window.useDefinitions && window.useDefinitions[useName]) || "";
+}
+function htmlEscape(s) {
+  return String(s)
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;");
+}
+    
     <script>
         // Populate dropdowns
         function populateDropdowns() {
@@ -322,6 +342,14 @@
 
             const useData = zoningData[selectedUse];
             let html = `<h3>Where "${selectedUse}" is allowed:</h3>`;
+
+            const def = getDefinition(selectedUse);
+  if (def) {
+    html += `
+      <div class="definition-banner">
+        <strong>Definition:</strong> ${htmlEscape(def)}
+      </div>`;
+  }
             
             const permitted = [];
             const conditional = [];
@@ -404,7 +432,15 @@
                     }
                 }
             });
-
+ function landUseSpan(lu) {
+    const def = getDefinition(lu);
+    const escLu = htmlEscape(lu);
+    const escDef = htmlEscape(def);
+    // native tooltip when def exists
+    return def
+      ? `<span class="zone-name" title="${escDef}" aria-label="${escDef}">${escLu}</span>`
+      : `<span class="zone-name">${escLu}</span>`;
+  }
             if (permitted.length > 0) {
                 html += '<h4 style="color: #27ae60; margin-top: 20px;">Permitted Uses:</h4>';
                 permitted.forEach(item => {
