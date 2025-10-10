@@ -292,12 +292,19 @@
     });
   }
 
-  function getPermissionClass(permission) {
-    if (permission === "Not Permitted") return "not-permitted";
-    if (permission.startsWith("CUP")) return "conditional";
-    if (permission.startsWith("A")) return "accessory";
-    return "permitted";
-  }
+function normalizePermission(permission) {
+  const p = (permission || "").toLowerCase().trim();
+  if (!p || p === "not permitted" || p === "np") return "not-permitted";
+  if (p.startsWith("cup") || p.includes("conditional")) return "conditional";
+  if (p.startsWith("a") || p.includes("accessory")) return "accessory";
+  // fallback
+  if (p === "permitted" || p === "p") return "permitted";
+  return "permitted";
+}
+
+function getPermissionClass(permission) {
+  return normalizePermission(permission);
+}
 
   // === Search: Land Use ===
   function searchByLandUse() {
@@ -329,15 +336,17 @@
     const permitted = [], conditional = [], accessory = [], notPermitted = [];
     Object.entries(useData).forEach(([zone, permission]) => {
       const item = { zone, permission };
-      if (permission === "Not Permitted") notPermitted.push(item);
-      else if (permission.startsWith("CUP")) conditional.push(item);
-      else if (permission.startsWith("A")) accessory.push(item);
-      else permitted.push(item);
+const kind = normalizePermission(permission);
+if (kind === "not-permitted") notPermitted.push(item);
+else if (kind === "conditional") conditional.push(item);
+else if (kind === "accessory") accessory.push(item);
+else permitted.push(item);
+
     });
 
     if (permitted.length) {
-      html += '<h4 style="color:#27ae60;margin-top:20px;">Permitted:</h4>';
-      permitted.forEach(item => {
+  html += '<h4 class="section-header permitted">Permitted:</h4>';
+        permitted.forEach(item => {
         html += `<div class="result-item permitted">
           <span class="zone-name">${htmlEscape(item.zone)}</span>
           <div class="permission-detail">${htmlEscape(item.permission)}</div>
@@ -345,7 +354,7 @@
       });
     }
     if (conditional.length) {
-      html += '<h4 style="color:#f39c12;margin-top:20px;">Conditional Use Permit Required:</h4>';
+  html += '<h4 class="section-header conditional">Conditional Use Permit Required:</h4>';
       conditional.forEach(item => {
         html += `<div class="result-item conditional">
           <span class="zone-name">${htmlEscape(item.zone)}</span>
@@ -354,7 +363,7 @@
       });
     }
     if (accessory.length) {
-      html += '<h4 style="color:#9b59b6;margin-top:20px;">Accessory Use:</h4>';
+  html += '<h4 class="section-header accessory">Accessory Use:</h4>';
       accessory.forEach(item => {
         html += `<div class="result-item accessory">
           <span class="zone-name">${htmlEscape(item.zone)}</span>
@@ -381,12 +390,14 @@
 
     Object.entries(window.zoningData || {}).forEach(([landUse, zones]) => {
       const permission = zones[selectedZone];
-      if (permission && permission !== "Not Permitted") {
-        const item = { landUse, permission };
-        if (permission.startsWith("CUP")) conditional.push(item);
-        else if (permission.startsWith("A")) accessory.push(item);
-        else permitted.push(item);
-      }
+      const kind = normalizePermission(permission);
+if (kind !== "not-permitted") {
+  const item = { landUse, permission };
+  if (kind === "conditional") conditional.push(item);
+  else if (kind === "accessory") accessory.push(item);
+  else permitted.push(item);
+}
+
     });
 
     const landUseSpan = (lu) => {
@@ -399,7 +410,7 @@
     };
 
     if (permitted.length) {
-      html += '<h4 style="color:#27ae60;margin-top:20px;">Permitted Uses:</h4>';
+html += '<h4 class="section-header permitted">Permitted Uses:</h4>';
       permitted.forEach(item => {
         html += `<div class="result-item permitted">
           ${landUseSpan(item.landUse)}
@@ -408,7 +419,7 @@
       });
     }
     if (conditional.length) {
-      html += '<h4 style="color:#f39c12;margin-top:20px;">Conditional Use Permit Required:</h4>';
+html += '<h4 class="section-header conditional">Conditional Use Permit Required:</h4>';
       conditional.forEach(item => {
         html += `<div class="result-item conditional">
           ${landUseSpan(item.landUse)}
@@ -417,7 +428,7 @@
       });
     }
     if (accessory.length) {
-      html += '<h4 style="color:#9b59b6;margin-top:20px;">Accessory Uses:</h4>';
+html += '<h4 class="section-header accessory">Accessory Uses:</h4>';
       accessory.forEach(item => {
         html += `<div class="result-item accessory">
           ${landUseSpan(item.landUse)}
