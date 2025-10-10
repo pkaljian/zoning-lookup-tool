@@ -148,15 +148,16 @@
             color: #555;
             font-size: 0.95em;
         }
-.results h4 {
+.results .section-header {
   display: inline-block;
-  padding: 4px 8px;
+  margin-top: 20px;
+  padding: 6px 10px;
   border-radius: 6px;
   font-weight: 600;
 }
-.results h4:nth-of-type(1) { background: #eaf7ee; color: #1e7e34; }    /* Permitted */
-.results h4:nth-of-type(2) { background: #fff3e0; color: #b05600; }    /* Conditional */
-.results h4:nth-of-type(3) { background: #f3e9fb; color: #6f42c1; }    /* Accessory */
+.results .section-header.permitted   { background: #eaf7ee; color: #1e7e34; }  /* green */
+.results .section-header.conditional { background: #fff3e0; color: #b05600; }  /* orange */
+.results .section-header.accessory   { background: #f3e9fb; color: #6f42c1; }  /* purple */
 
         .loading {
             text-align: center;
