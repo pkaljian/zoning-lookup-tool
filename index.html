@@ -252,9 +252,48 @@
 
 <script>
   // === Helpers ===
-  function getDefinition(useName) {
-    return (window.useDefinitions && window.useDefinitions[useName]) || "";
+function getDefinition(useName) {
+  const dict = window.useDefinitions || {};
+  if (!useName) return "";
+
+  // exact match first
+  if (dict[useName]) return dict[useName];
+
+  // normalize the key
+  const normalize = s => String(s)
+    .toLowerCase()
+    .replace(/\band\b/g, '&')
+    .replace(/&/g, 'and')
+    .replace(/[\/,–—\-]/g, ' ')     // unify separators
+    .replace(/\s+/g, ' ')           // collapse spaces
+    .trim();
+
+  const normKey = normalize(useName);
+
+  // build a normalized index once per session
+  if (!window.__defsIndex) {
+    window.__defsIndex = {};
+    for (const k of Object.keys(dict)) {
+      window.__defsIndex[normalize(k)] = k;
+    }
   }
+
+  // find nearest normalized key
+  const match = window.__defsIndex[normKey];
+  if (match) return dict[match];
+
+  // optional fuzzy fallback: look for partial containment
+  for (const [k, v] of Object.entries(dict)) {
+    const nk = normalize(k);
+    if (nk.includes(normKey) || normKey.includes(nk)) {
+      return v;
+    }
+  }
+
+  return "";
+}
+
+
   function htmlEscape(s) {
     return String(s)
       .replace(/&/g,"&amp;")
