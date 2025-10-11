@@ -459,5 +459,20 @@ html += '<h4 class="section-header accessory">Accessory Uses:</h4>';
     });
   });
 </script>
+    <script>
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[Defs] present?', !!window.useDefinitions,
+              'count:', window.useDefinitions ? Object.keys(window.useDefinitions).length : 0);
+
+  // When you change either dropdown, this will show what definition we found
+  const logDef = () => {
+    const lu = document.getElementById('landUseSelect').value;
+    if (!lu) return;
+    console.log('[Defs] selected:', JSON.stringify(lu), '→', JSON.stringify(getDefinition(lu)));
+  };
+  document.getElementById('landUseSelect').addEventListener('change', logDef);
+});
+</script>
+
 </body>
 </html>
