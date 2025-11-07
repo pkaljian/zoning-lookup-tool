@@ -500,45 +500,11 @@ html += '<h4 class="section-header accessory">Accessory Uses:</h4>';
     });
   });
 </script>
-    <script>
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('[Defs] present?', !!window.useDefinitions,
-              'count:', window.useDefinitions ? Object.keys(window.useDefinitions).length : 0);
 
-  // When you change either dropdown, this will show what definition we found
-  const logDef = () => {
-    const lu = document.getElementById('landUseSelect').value;
-    if (!lu) return;
-    console.log('[Defs] selected:', JSON.stringify(lu), '→', JSON.stringify(getDefinition(lu)));
-  };
-  document.getElementById('landUseSelect').addEventListener('change', logDef);
-});
-</script>
-<!-- Split toggle button (put near your results header) -->
-<div class="splitbar"><button id="toggleSplit">Split View</button></div>
-
-<!-- Map panel (bottom of page) -->
-<section id="map-panel" style="border-top:1px solid #e5e7eb;padding:.75rem 0;">
-  <div class="map-toolbar" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
-    <!-- UNIQUE IDS so we don't clash with your main UI -->
-    <label>Land Use:</label>
-    <select id="mapLandUseSelect"><option value="">All</option></select>
-
-    <label>Zoning:</label>
-    <select id="mapZoningSelect"><option value="">All</option></select>
-
-    <label><input type="checkbox" id="mapDimOthers" checked> Highlight only (dim others)</label>
-    <label><input type="checkbox" id="mapFilterOut"> Filter out non-matches</label>
-  </div>
+<!-- Minimal map panel (no extra controls) -->
+<section id="map-panel" style="border-top:1px solid #e5e7eb;padding:.75rem 0;margin-top:1rem;">
   <div id="viewDiv" style="height:520px;width:100%;border:1px solid #e5e7eb;border-radius:.5rem;"></div>
 </section>
-
-<script>
-  // Split toggle
-  document.getElementById('toggleSplit')?.addEventListener('click', () => {
-    document.body.classList.toggle('split-on');
-  });
-</script>
 
 <script type="module">
   import WebMap from "https://js.arcgis.com/4.30/@arcgis/core/WebMap.js";
@@ -547,28 +513,34 @@ document.addEventListener('DOMContentLoaded', () => {
   import Search from "https://js.arcgis.com/4.30/@arcgis/core/widgets/Search.js";
   import UniqueValueRenderer from "https://js.arcgis.com/4.30/@arcgis/core/renderers/UniqueValueRenderer.js";
 
-  // --- Config ---
+  // ---- Config ----
   const WEBMAP_ID = "fed3b55fe5bf4220b0e74608433eec19";
   const ZONE_FIELD = "Zoning8";
   const APN_FIELD  = "APN";
 
-  // Map controls (unique IDs)
-  const LU_SELECT = document.getElementById("mapLandUseSelect");
-  const ZD_SELECT = document.getElementById("mapZoningSelect");
-  const DIM_CHK   = document.getElementById("mapDimOthers");
-  const FIL_CHK   = document.getElementById("mapFilterOut");
+  // Mirror your existing controls
+  const LU_SELECT = document.getElementById("landUseSelect"); // existing
+  const ZD_SELECT = document.getElementById("zoneSelect");    // existing
 
-  // Colors to match your results UI vibe
+  // Mode (no checkboxes): default to highlight + dim others; honor ?mode=filter if present
+  const params = new URLSearchParams(location.search);
+  let FILTER_MODE = params.get("mode") === "filter";  // true => filter out; false => dim others
+  const EXCLUDED_EFFECT = "grayscale(80%) opacity(35%)";
+
+  // Colors aligned to your results chips
   const COLORS = {
-    allowed:     [34,197,94,0.35],   // permitted (green)
-    conditional: [234,179,8,0.35],   // conditional (amber)
-    notAllowed:  [239,68,68,0.35],   // not permitted (red)
-    zoneOnly:    [59,130,246,0.30],  // single-zone (blue)
+    permitted:   [34,197,94,0.35],
+    conditional: [234,179,8,0.35],
+    notPermitted:[239,68,68,0.35],
+    zoneOnly:    [59,130,246,0.30],
     outline:     [48,48,48,1]
   };
 
-  // URL helpers
-  const getParams = () => new URLSearchParams(location.search);
+  const zoningData = window.zoningData || {};
+  const normalizePermission = window.normalizePermission || ((p)=>"permitted");
+
+  // Helpers
+  const sql = (s) => String(s).replaceAll("'", "''");
   const setParams = (obj) => {
     const u = new URL(location.href);
     Object.entries(obj).forEach(([k,v]) => {
@@ -578,27 +550,36 @@ document.addEventListener('DOMContentLoaded', () => {
     history.replaceState({}, "", u.toString());
   };
 
-  // ArcGIS map init
-  const webmap = new WebMap({ portalItem: { id: WEBMAP_ID } });
-  const view = new MapView({ map: webmap, container: "viewDiv", constraints: { snapToZoom:false }});
-  view.ui.add(new Search({ view }), "top-right");
-  view.ui.add(new Legend({ view }), "bottom-right");
+  function zonesForLandUse(lu) {
+    const out = { permitted:[], conditional:[], accessory:[], notPermitted:[] };
+    const row = zoningData[lu] || {};
+    for (const [zone, perm] of Object.entries(row)) {
+      if (!zone) continue;
+      const kind = normalizePermission(perm);
+      if (kind === "conditional") out.conditional.push(zone);
+      else if (kind === "accessory") out.permitted.push(zone); // map accessory as permitted color
+      else if (kind === "not-permitted") out.notPermitted.push(zone);
+      else out.permitted.push(zone);
+    }
+    return out;
+  }
 
-  let layer, layerView;
-
-  const sql = (s) => String(s).replaceAll("'", "''");
-  const zoomWhere = async (w) => {
-    const { extent } = await layer.queryExtent({ where: w });
-    if (extent) await view.goTo({ target: extent.expand(1.1) }, { duration: 500 }).catch(()=>{});
-  };
-
-  const uvRendererBuckets = (allowed, cond, notA) => new UniqueValueRenderer({
+  const uvRendererBuckets = (permitted, conditional, notPermitted) => new UniqueValueRenderer({
     field: ZONE_FIELD,
-    defaultSymbol: { type:"simple-fill", color:[0,0,0,0], outline:{ type:"simple-line", color:COLORS.outline, width:0.25 }},
+    defaultSymbol: { type:"simple-fill", color:[0,0,0,0], outline:{ type:"simple-line", color:COLORS.outline, width:.25 }},
     uniqueValueInfos: [
-      ...allowed.map(v => ({ value:v, label:"Permitted",   symbol:{ type:"simple-fill", color:COLORS.allowed,     outline:{ type:"simple-line", color:COLORS.outline, width:0.5 }}})),
-      ...cond.map(v    => ({ value:v, label:"Conditional", symbol:{ type:"simple-fill", color:COLORS.conditional, outline:{ type:"simple-line", color:COLORS.outline, width:0.5 }}})),
-      ...notA.map(v    => ({ value:v, label:"Not Permitted", symbol:{ type:"simple-fill", color:COLORS.notAllowed, outline:{ type:"simple-line", color:COLORS.outline, width:0.5 }}})),
+      ...permitted.map(v => ({
+        value:v, label:"Permitted",
+        symbol:{ type:"simple-fill", color:COLORS.permitted, outline:{ type:"simple-line", color:COLORS.outline, width:.5 } }
+      })),
+      ...conditional.map(v => ({
+        value:v, label:"Conditional",
+        symbol:{ type:"simple-fill", color:COLORS.conditional, outline:{ type:"simple-line", color:COLORS.outline, width:.5 } }
+      })),
+      ...notPermitted.map(v => ({
+        value:v, label:"Not Permitted",
+        symbol:{ type:"simple-fill", color:COLORS.notPermitted, outline:{ type:"simple-line", color:COLORS.outline, width:.5 } }
+      })),
     ]
   });
 
@@ -606,86 +587,59 @@ document.addEventListener('DOMContentLoaded', () => {
     field: ZONE_FIELD,
     uniqueValueInfos: [{
       value: zone,
-      symbol: { type:"simple-fill", color:COLORS.zoneOnly, outline:{ type:"simple-line", color:COLORS.outline, width:.75 } },
-      label: zone
+      label: zone,
+      symbol:{ type:"simple-fill", color:COLORS.zoneOnly, outline:{ type:"simple-line", color:COLORS.outline, width:.75 } }
     }],
     defaultSymbol: { type:"simple-fill", color:[0,0,0,0] }
   });
 
-  // Use your existing data + helper to compute sets
-  const normalizePermission = window.normalizePermission || ((p)=>"permitted");
-  const zoningData = window.zoningData || {};
+  // Map init
+  const webmap = new WebMap({ portalItem: { id: WEBMAP_ID } });
+  const view = new MapView({ map: webmap, container: "viewDiv", constraints:{ snapToZoom:false }});
+  view.ui.add(new Search({ view }), "top-right");
+  view.ui.add(new Legend({ view }), "bottom-right");
 
-  function zonesForLandUse(lu) {
-    // returns { permitted:[], conditional:[], accessory:[], notPermitted:[] }
-    const out = { permitted:[], conditional:[], accessory:[], notPermitted:[] };
-    const row = zoningData[lu] || {};
-    for (const [zone, perm] of Object.entries(row)) {
-      if (!zone) continue;
-      const kind = normalizePermission(perm);
-      if (kind === "conditional") out.conditional.push(zone);
-      else if (kind === "accessory") out.accessory.push(zone);
-      else if (kind === "not-permitted") out.notPermitted.push(zone);
-      else out.permitted.push(zone);
-    }
-    return out;
-  }
+  let layer, layerView;
 
-  // Fill the map’s dropdowns from your existing data
-  function populateMapDropdowns() {
-    if (LU_SELECT) {
-      const landUses = Object.keys(zoningData).sort();
-      LU_SELECT.innerHTML = '<option value="">All</option>' +
-        landUses.map(lu => `<option>${lu}</option>`).join("");
-    }
-    if (ZD_SELECT) {
-      const zones = Array.from(new Set(
-        Object.values(zoningData).flatMap(row => Object.keys(row || {}))
-      )).filter(Boolean).sort();
-      ZD_SELECT.innerHTML = '<option value="">All</option>' +
-        zones.map(z => `<option>${z}</option>`).join("");
-    }
-  }
+  const zoomWhere = async (w) => {
+    const { extent } = await layer.queryExtent({ where: w });
+    if (extent) await view.goTo({ target: extent.expand(1.1) }, { duration: 500 }).catch(()=>{});
+  };
 
-  // Apply LU coloring (buckets) to the map
-  async function applyLU() {
+  async function applyLUFromMain() {
     const lu = LU_SELECT?.value || "";
-    setParams({ lu, zd: null, mode: FIL_CHK?.checked ? "filter" : "highlight" });
+    // clear 'zd' when LU is active
+    setParams({ lu, zd: null, mode: FILTER_MODE ? "filter" : "highlight" });
     if (!lu) { layer.renderer=null; layerView.filter=null; layer.definitionExpression=""; return; }
 
     const sets = zonesForLandUse(lu);
-    const all = [...new Set([...sets.permitted, ...sets.conditional, ...sets.accessory, ...sets.notPermitted])];
+    const all = [...new Set([...sets.permitted, ...sets.conditional, ...sets.notPermitted])];
     const where = all.length ? `${ZONE_FIELD} IN (${all.map(v=>`'${sql(v)}'`).join(",")})` : "1=0";
 
-    if (FIL_CHK?.checked) {
+    if (FILTER_MODE) {
       layer.definitionExpression = all.length ? where : "";
       layerView.filter = null; layerView.effect = null;
     } else {
       layer.definitionExpression = "";
       layerView.filter = all.length ? { where } : null;
-      layerView.effect = layerView.filter ? {
-        filter: layerView.filter,
-        excludedEffect: (DIM_CHK?.checked ? "grayscale(80%) opacity(35%)" : null)
-      } : null;
+      layerView.effect = layerView.filter ? { filter: layerView.filter, excludedEffect: EXCLUDED_EFFECT } : null;
     }
-
-    // Accessory is a distinct category in your UI, but for map coloring we can show it as permitted or ignore.
-    layer.renderer = uvRendererBuckets(sets.permitted.concat(sets.accessory), sets.conditional, sets.notPermitted);
+    layer.renderer = uvRendererBuckets(sets.permitted, sets.conditional, sets.notPermitted);
     if (all.length) await zoomWhere(where);
   }
 
-  // Apply single zoning district highlight
-  async function applyZD() {
+  async function applyZDFromMain() {
     const zd = ZD_SELECT?.value || "";
-    setParams({ zd, lu: null, mode: FIL_CHK?.checked ? "filter" : "highlight" });
+    // clear 'lu' when ZD is active
+    setParams({ zd, lu: null, mode: FILTER_MODE ? "filter" : "highlight" });
     if (!zd) { layer.renderer=null; layerView.filter=null; layer.definitionExpression=""; return; }
 
     const where = `${ZONE_FIELD}='${sql(zd)}'`;
-    if (FIL_CHK?.checked) {
+    if (FILTER_MODE) {
       layer.definitionExpression = where; layerView.filter=null; layerView.effect=null;
     } else {
       layer.definitionExpression = ""; layerView.filter = { where };
-      layerView.effect = { filter: { where }, excludedEffect: (DIM_CHK?.checked ? "grayscale(80%) opacity(35%)" : null) };
+      layerView.effect = { filter: { where }, excludedEffect: EXCLUDED_EFFECT };
     }
     layer.renderer = uvRendererZoneOnly(zd);
     await zoomWhere(where);
@@ -702,9 +656,9 @@ document.addEventListener('DOMContentLoaded', () => {
     view.popup.open({ features: [g], location: event.mapPoint });
   });
 
-  // Deep-link restore for ?apn=
+  // Restore ?apn=
   async function restoreAPNFromURL() {
-    const apn = getParams().get("apn");
+    const apn = new URLSearchParams(location.search).get("apn");
     if (!apn) return;
     const q = layer.createQuery();
     q.where = `${APN_FIELD}='${sql(apn)}'`;
@@ -719,7 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Boot
   view.when(async () => {
-    // Find the first layer with Zoning8
+    // Find layer with Zoning8
     for (const lyr of webmap.layers.toArray()) {
       const names = (lyr.fields||[]).map(f=>f.name.toLowerCase());
       if (names.includes(ZONE_FIELD.toLowerCase())) { layer = lyr; break; }
@@ -727,26 +681,24 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!layer) { console.warn("No layer with Zoning8 found in webmap."); return; }
     layerView = await view.whenLayerView(layer);
 
-    populateMapDropdowns();
+    // Wire to main selectors
+    LU_SELECT?.addEventListener("change", applyLUFromMain);
+    ZD_SELECT?.addEventListener("change", applyZDFromMain);
 
-    // Wire UI
-    DIM_CHK?.addEventListener("change", () => (ZD_SELECT?.value ? applyZD() : applyLU()));
-    FIL_CHK?.addEventListener("change", () => {
-      DIM_CHK && (DIM_CHK.disabled = FIL_CHK.checked);
-      (ZD_SELECT?.value ? applyZD() : applyLU());
-    });
-    LU_SELECT?.addEventListener("change", () => { ZD_SELECT && (ZD_SELECT.value=""); applyLU(); });
-    ZD_SELECT?.addEventListener("change", () => { LU_SELECT && (LU_SELECT.value=""); applyZD(); });
-
-    // Restore from URL
-    const p = getParams();
-    if (p.get("mode")==="filter") { FIL_CHK && (FIL_CHK.checked=true); DIM_CHK && (DIM_CHK.disabled=true); }
-    if (p.get("zd")) { ZD_SELECT && (ZD_SELECT.value=p.get("zd")); await applyZD(); }
-    if (p.get("lu")) { LU_SELECT && (LU_SELECT.value=p.get("lu")); await applyLU(); }
-
+    // Initial restore from URL/main UI
+    const p = new URLSearchParams(location.search);
+    if (p.get("mode")==="filter") FILTER_MODE = true; // no UI, but honor URL
+    if (p.get("zd")) {
+      ZD_SELECT && (ZD_SELECT.value = p.get("zd"));
+      await applyZDFromMain();
+    } else if (p.get("lu")) {
+      LU_SELECT && (LU_SELECT.value = p.get("lu"));
+      await applyLUFromMain();
+    }
     await restoreAPNFromURL();
   });
 </script>
+
 
 <style>
   /* simple split view */
