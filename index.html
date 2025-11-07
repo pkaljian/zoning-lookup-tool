@@ -512,6 +512,196 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('landUseSelect').addEventListener('change', logDef);
 });
 </script>
+<!-- Split toggle button (put near your results header) -->
+<div class="splitbar"><button id="toggleSplit">Split View</button></div>
+
+<!-- Map panel (bottom of page) -->
+<section id="map-panel" style="border-top:1px solid #e5e7eb;padding:.75rem 0;">
+  <div class="map-toolbar" style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem;">
+    <!-- re-use your existing Land Use + Zoning selects if you have them;
+         otherwise this is a safe fallback (wire-up will find your real ones if present) -->
+    <label>Land Use:</label>
+    <select id="landUseSelect"><option value="">All</option></select>
+
+    <label>Zoning:</label>
+    <select id="zoningSelect"><option value="">All</option></select>
+
+    <label><input type="checkbox" id="dimOthers" checked> Highlight only (dim others)</label>
+    <label><input type="checkbox" id="filterOut"> Filter out non-matches</label>
+  </div>
+  <div id="viewDiv" style="height:520px;width:100%;border:1px solid #e5e7eb;border-radius:.5rem;"></div>
+</section>
+
+<script>
+  // Split toggle
+  document.getElementById('toggleSplit')?.addEventListener('click', () => {
+    document.body.classList.toggle('split-on');
+  });
+</script>
+<script type="module">
+  import WebMap from "https://js.arcgis.com/4.30/@arcgis/core/WebMap.js";
+  import MapView from "https://js.arcgis.com/4.30/@arcgis/core/views/MapView.js";
+  import Legend from "https://js.arcgis.com/4.30/@arcgis/core/widgets/Legend.js";
+  import Search from "https://js.arcgis.com/4.30/@arcgis/core/widgets/Search.js";
+  import UniqueValueRenderer from "https://js.arcgis.com/4.30/@arcgis/core/renderers/UniqueValueRenderer.js";
+
+  // --- Config you gave me ---
+  const WEBMAP_ID = "fed3b55fe5bf4220b0e74608433eec19";
+  const ZONE_FIELD = "Zoning8";
+  const APN_FIELD = null; // set to "APN" if you know it; null to auto-detect
+
+  // Reuse your existing selects if present; otherwise use the fallbacks we added
+  const LU_SELECT = document.querySelector("#landUseSelect") || document.querySelector("[data-lu-select]");
+  const ZD_SELECT = document.querySelector("#zoningSelect")  || document.querySelector("[data-zd-select]");
+  const DIM_CHK   = document.getElementById("dimOthers");
+  const FIL_CHK   = document.getElementById("filterOut");
+
+  // Color tokens—match your results UI colors here
+  const COLORS = {
+    allowed:     [34,197,94,0.35],
+    conditional: [234,179,8,0.35],
+    notAllowed:  [239,68,68,0.35],
+    zoneOnly:    [59,130,246,0.30],
+    outline:     [48,48,48,1]
+  };
+
+  // URL helpers
+  const getParams = () => new URLSearchParams(location.search);
+  const setParams = (obj) => {
+    const u = new URL(location.href);
+    Object.entries(obj).forEach(([k,v]) => v ? u.searchParams.set(k,v) : u.searchParams.delete(k));
+    history.replaceState({}, "", u.toString());
+  };
+
+  // Map init
+  const webmap = new WebMap({ portalItem: { id: WEBMAP_ID } });
+  const view = new MapView({ map: webmap, container: "viewDiv", constraints: { snapToZoom:false }});
+  view.ui.add(new Search({ view }), "top-right");
+  view.ui.add(new Legend({ view }), "bottom-right");
+
+  let layer, layerView, apnField = APN_FIELD;
+
+  const sql = (s) => String(s).replaceAll("'", "''");
+  const zoomWhere = async (w) => {
+    const { extent } = await layer.queryExtent({ where: w });
+    if (extent) await view.goTo({ target: extent.expand(1.1) }, { duration: 500 }).catch(()=>{});
+  };
+
+  const uvRendererBuckets = (allowed, cond, notA) => new UniqueValueRenderer({
+    field: ZONE_FIELD,
+    defaultSymbol: { type:"simple-fill", color:[0,0,0,0], outline:{ type:"simple-line", color:COLORS.outline, width:0.25 }},
+    uniqueValueInfos: [
+      ...allowed.map(v => ({ value:v, label:"Allowed", symbol:{ type:"simple-fill", color:COLORS.allowed, outline:{ type:"simple-line", color:COLORS.outline, width:0.5 }}})),
+      ...cond.map(v => ({ value:v, label:"Conditional", symbol:{ type:"simple-fill", color:COLORS.conditional, outline:{ type:"simple-line", color:COLORS.outline, width:0.5 }}})),
+      ...notA.map(v => ({ value:v, label:"Not Allowed", symbol:{ type:"simple-fill", color:COLORS.notAllowed, outline:{ type:"simple-line", color:COLORS.outline, width:0.5 }}})),
+    ]
+  });
+
+  const uvRendererZoneOnly = (zone) => new UniqueValueRenderer({
+    field: ZONE_FIELD,
+    uniqueValueInfos: [{
+      value: zone,
+      symbol: { type:"simple-fill", color:COLORS.zoneOnly, outline:{ type:"simple-line", color:COLORS.outline, width:.75 } },
+      label: zone
+    }],
+    defaultSymbol: { type:"simple-fill", color:[0,0,0,0] }
+  });
+
+  // Glue to YOUR logic:
+  // Expect these functions to exist or be easy to expose from your current JS:
+  //   window.zMatrix.getAllowedFor(lu)        -> string[] of Zoning8 codes
+  //   window.zMatrix.getConditionalFor(lu)    -> string[]
+  //   window.zMatrix.getNotAllowedFor(lu)     -> string[]
+  //   window.zMatrix.getAllZones()            -> string[] (to fill ZD select)
+  // If names differ, tell me—I'll rename in 10s.
+  const fillZoningDropdown = () => {
+    if (!ZD_SELECT || !window.zMatrix?.getAllZones) return;
+    const zones = window.zMatrix.getAllZones();
+    ZD_SELECT.innerHTML = `<option value="">All</option>` + zones.map(z => `<option value="${z}">${z}</option>`).join("");
+  };
+
+  const applyLU = async () => {
+    const lu = LU_SELECT?.value || "";
+    setParams({ lu, mode: FIL_CHK?.checked ? "filter" : "highlight" });
+    if (!lu || !window.zMatrix) { layer.renderer = null; layerView.filter=null; layer.definitionExpression=""; return; }
+    const allowed = window.zMatrix.getAllowedFor(lu) || [];
+    const cond    = window.zMatrix.getConditionalFor(lu) || [];
+    const notA    = window.zMatrix.getNotAllowedFor(lu) || [];
+
+    const values = [...new Set([...allowed, ...cond, ...notA])];
+    const where = values.length ? `${ZONE_FIELD} IN (${values.map(v=>`'${sql(v)}'`).join(",")})` : "1=0";
+
+    if (FIL_CHK?.checked) {
+      layer.definitionExpression = values.length ? where : "";
+      layerView.filter = null; layerView.effect = null;
+    } else {
+      layer.definitionExpression = "";
+      layerView.filter = values.length ? { where } : null;
+      layerView.effect = layerView.filter ? { filter: layerView.filter, excludedEffect: (DIM_CHK?.checked ? "grayscale(80%) opacity(35%)" : null) } : null;
+    }
+    layer.renderer = uvRendererBuckets(allowed, cond, notA);
+    if (values.length) await zoomWhere(where);
+  };
+
+  const applyZD = async () => {
+    const zd = ZD_SELECT?.value || "";
+    setParams({ zd, mode: FIL_CHK?.checked ? "filter" : "highlight" });
+    if (!zd) { layer.renderer=null; layerView.filter=null; layer.definitionExpression=""; return; }
+    const where = `${ZONE_FIELD}='${sql(zd)}'`;
+    if (FIL_CHK?.checked) {
+      layer.definitionExpression = where; layerView.filter=null; layerView.effect=null;
+    } else {
+      layer.definitionExpression = ""; layerView.filter = { where };
+      layerView.effect = { filter: { where }, excludedEffect: (DIM_CHK?.checked ? "grayscale(80%) opacity(35%)" : null) };
+    }
+    layer.renderer = uvRendererZoneOnly(zd);
+    await zoomWhere(where);
+  };
+
+  // Boot
+  view.when(async () => {
+    // Find the first layer with Zoning8
+    for (const lyr of webmap.layers.toArray()) {
+      const names = (lyr.fields||[]).map(f=>f.name.toLowerCase());
+      if (names.includes(ZONE_FIELD.toLowerCase())) { layer = lyr; break; }
+    }
+    if (!layer) { console.warn("No layer with Zoning8 found in webmap."); return; }
+    layerView = await view.whenLayerView(layer);
+
+    // APN field auto-detect (if not specified)
+    if (!apnField) {
+      const rx = /(apn|assessor.*parcel|parcel.*(id|number))/i;
+      const hit = (layer.fields||[]).find(f => rx.test(f.name));
+      apnField = hit?.name || null;
+    }
+
+    // Wire UI
+    DIM_CHK?.addEventListener("change", () => (ZD_SELECT?.value ? applyZD() : applyLU()));
+    FIL_CHK?.addEventListener("change", () => {
+      DIM_CHK && (DIM_CHK.disabled = FIL_CHK.checked);
+      (ZD_SELECT?.value ? applyZD() : applyLU());
+    });
+    LU_SELECT?.addEventListener("change", () => { ZD_SELECT && (ZD_SELECT.value=""); applyLU(); });
+    ZD_SELECT?.addEventListener("change", () => { LU_SELECT && (LU_SELECT.value=""); applyZD(); });
+
+    // Fill zoning dropdown from your matrix (if exposed)
+    fillZoningDropdown();
+
+    // Restore from URL
+    const p = getParams();
+    if (p.get("mode")==="filter") { FIL_CHK && (FIL_CHK.checked=true); DIM_CHK && (DIM_CHK.disabled=true); }
+    if (p.get("zd")) { ZD_SELECT && (ZD_SELECT.value=p.get("zd")); await applyZD(); }
+    if (p.get("lu")) { LU_SELECT && (LU_SELECT.value=p.get("lu")); await applyLU(); }
+  });
+</script>
+
+<style>
+  /* simple split view */
+  body.split-on #main, body.split-on #map-panel { /* adjust #main to your results wrapper */
+    display:grid; grid-template-columns: 1fr 1fr; gap:.75rem;
+  }
+  @media (max-width:900px){ body.split-on #main, body.split-on #map-panel { grid-template-columns:1fr; } }
+</style>
 
 </body>
 </html>
