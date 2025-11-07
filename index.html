@@ -527,14 +527,15 @@ html += '<h4 class="section-header accessory">Accessory Uses:</h4>';
   let FILTER_MODE = params.get("mode") === "filter";  // true => filter out; false => dim others
   const EXCLUDED_EFFECT = "grayscale(80%) opacity(35%)";
 
-  // Colors aligned to your results chips
-  const COLORS = {
-    permitted:   [34,197,94,0.35],
-    conditional: [234,179,8,0.35],
-    notPermitted:[239,68,68,0.35],
-    zoneOnly:    [59,130,246,0.30],
-    outline:     [48,48,48,1]
-  };
+// Colors aligned to your UI legend
+const COLORS = {
+  permitted:   [30,126,52,0.4],   // green
+  conditional: [176,86,0,0.4],    // orange
+  accessory:   [111,66,193,0.35], // purple
+  notPermitted:[231,76,60,0.35],  // red
+  zoneOnly:    [59,130,246,0.30], // blue
+  outline:     [48,48,48,1]
+};
 
   const zoningData = window.zoningData || {};
   const normalizePermission = window.normalizePermission || ((p)=>"permitted");
@@ -564,22 +565,39 @@ html += '<h4 class="section-header accessory">Accessory Uses:</h4>';
     return out;
   }
 
-  const uvRendererBuckets = (permitted, conditional, notPermitted) => new UniqueValueRenderer({
+  const uvRendererBuckets = (permitted, conditional, accessory, notPermitted) =>
+  new UniqueValueRenderer({
     field: ZONE_FIELD,
-    defaultSymbol: { type:"simple-fill", color:[0,0,0,0], outline:{ type:"simple-line", color:COLORS.outline, width:.25 }},
+    defaultSymbol: {
+      type: "simple-fill",
+      color: [0, 0, 0, 0],
+      outline: { type: "simple-line", color: COLORS.outline, width: 0.25 }
+    },
     uniqueValueInfos: [
       ...permitted.map(v => ({
-        value:v, label:"Permitted",
-        symbol:{ type:"simple-fill", color:COLORS.permitted, outline:{ type:"simple-line", color:COLORS.outline, width:.5 } }
+        value: v,
+        label: "Permitted",
+        symbol: { type: "simple-fill", color: COLORS.permitted,
+          outline: { type: "simple-line", color: COLORS.outline, width: 0.5 } }
       })),
       ...conditional.map(v => ({
-        value:v, label:"Conditional",
-        symbol:{ type:"simple-fill", color:COLORS.conditional, outline:{ type:"simple-line", color:COLORS.outline, width:.5 } }
+        value: v,
+        label: "Conditional Use Permit",
+        symbol: { type: "simple-fill", color: COLORS.conditional,
+          outline: { type: "simple-line", color: COLORS.outline, width: 0.5 } }
+      })),
+      ...accessory.map(v => ({
+        value: v,
+        label: "Accessory Use",
+        symbol: { type: "simple-fill", color: COLORS.accessory,
+          outline: { type: "simple-line", color: COLORS.outline, width: 0.5 } }
       })),
       ...notPermitted.map(v => ({
-        value:v, label:"Not Permitted",
-        symbol:{ type:"simple-fill", color:COLORS.notPermitted, outline:{ type:"simple-line", color:COLORS.outline, width:.5 } }
-      })),
+        value: v,
+        label: "Not Permitted",
+        symbol: { type: "simple-fill", color: COLORS.notPermitted,
+          outline: { type: "simple-line", color: COLORS.outline, width: 0.5 } }
+      }))
     ]
   });
 
@@ -613,7 +631,13 @@ html += '<h4 class="section-header accessory">Accessory Uses:</h4>';
     if (!lu) { layer.renderer=null; layerView.filter=null; layer.definitionExpression=""; return; }
 
     const sets = zonesForLandUse(lu);
-    const all = [...new Set([...sets.permitted, ...sets.conditional, ...sets.notPermitted])];
+const all = [...new Set([
+  ...sets.permitted,
+  ...sets.conditional,
+  ...sets.accessory,      // include accessory
+  ...sets.notPermitted
+])];
+
     const where = all.length ? `${ZONE_FIELD} IN (${all.map(v=>`'${sql(v)}'`).join(",")})` : "1=0";
 
     if (FILTER_MODE) {
@@ -624,7 +648,13 @@ html += '<h4 class="section-header accessory">Accessory Uses:</h4>';
       layerView.filter = all.length ? { where } : null;
       layerView.effect = layerView.filter ? { filter: layerView.filter, excludedEffect: EXCLUDED_EFFECT } : null;
     }
-    layer.renderer = uvRendererBuckets(sets.permitted, sets.conditional, sets.notPermitted);
+layer.renderer = uvRendererBuckets(
+  sets.permitted,
+  sets.conditional,
+  sets.accessory,         // include accessory
+  sets.notPermitted
+);
+
     if (all.length) await zoomWhere(where);
   }
 
