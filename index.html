@@ -671,32 +671,60 @@ html += '<h4 class="section-header accessory">Accessory Uses:</h4>';
     }
   }
 
-  // Boot
-  view.when(async () => {
-    // Find layer with Zoning8
-    for (const lyr of webmap.layers.toArray()) {
-      const names = (lyr.fields||[]).map(f=>f.name.toLowerCase());
-      if (names.includes(ZONE_FIELD.toLowerCase())) { layer = lyr; break; }
+ // Boot
+view.when(async () => {
+  // Resolve a proper FeatureLayer with Zoning8 (search ALL layers, including sublayers)
+  async function resolveTargetLayer() {
+    const all = view.map.allLayers.toArray(); // includes groups/sublayers
+    for (const lyr of all) {
+      try {
+        if (lyr.type !== "feature") continue;           // must be FeatureLayer
+        if (typeof lyr.load === "function") await lyr.load();
+        const names = (lyr.fields || []).map(f => f.name.toLowerCase());
+        if (names.includes(ZONE_FIELD.toLowerCase())) return lyr;
+      } catch (e) {
+        /* ignore load errors and keep looking */
+      }
     }
-    if (!layer) { console.warn("No layer with Zoning8 found in webmap."); return; }
-    layerView = await view.whenLayerView(layer);
+    return null;
+  }
 
-    // Wire to main selectors
-    LU_SELECT?.addEventListener("change", applyLUFromMain);
-    ZD_SELECT?.addEventListener("change", applyZDFromMain);
+  layer = await resolveTargetLayer();
+  if (!layer) {
+    console.warn("No FeatureLayer with Zoning8 found in the webmap.");
+    return;
+  }
 
-    // Initial restore from URL/main UI
-    const p = new URLSearchParams(location.search);
-    if (p.get("mode")==="filter") FILTER_MODE = true; // no UI, but honor URL
-    if (p.get("zd")) {
-      ZD_SELECT && (ZD_SELECT.value = p.get("zd"));
-      await applyZDFromMain();
-    } else if (p.get("lu")) {
-      LU_SELECT && (LU_SELECT.value = p.get("lu"));
-      await applyLUFromMain();
-    }
-    await restoreAPNFromURL();
-  });
+  layerView = await view.whenLayerView(layer);
+
+  // Check if highlight/dim is supported on this layerView
+  const SUPPORTS_EFFECT = "effect" in layerView && "filter" in layerView;
+  if (!SUPPORTS_EFFECT && !FILTER_MODE) {
+    console.warn("[Map] FeatureEffect not supported for this layerView; switching to filter mode.");
+    FILTER_MODE = true; // fallback so the user still sees something
+  }
+
+  console.log("[Map] Using layer:", layer.title || layer.id, 
+              "| supports effect:", SUPPORTS_EFFECT, 
+              "| mode:", FILTER_MODE ? "filter" : "highlight");
+
+  // Wire to main selectors
+  LU_SELECT?.addEventListener("change", applyLUFromMain);
+  ZD_SELECT?.addEventListener("change", applyZDFromMain);
+
+  // Initial restore from URL/main UI
+  const p = new URLSearchParams(location.search);
+  if (p.get("mode")==="filter") FILTER_MODE = true; // honor URL
+  if (p.get("zd")) {
+    ZD_SELECT && (ZD_SELECT.value = p.get("zd"));
+    await applyZDFromMain();
+  } else if (p.get("lu")) {
+    LU_SELECT && (LU_SELECT.value = p.get("lu"));
+    await applyLUFromMain();
+  }
+  await restoreAPNFromURL();
+});
+
 </script>
 
 
