@@ -374,12 +374,12 @@ function getPermissionClass(permission) {
         </div>`;
     }
 
-    const permitted = [], conditional = [], accessory = [], notPermitted = [];
+    const permitted = [], conditional = [], accessory = [];
     Object.entries(useData).forEach(([zone, permission]) => {
       const item = { zone, permission };
 const kind = normalizePermission(permission);
-if (kind === "not-permitted") notPermitted.push(item);
-else if (kind === "conditional") conditional.push(item);
+
+if (kind === "conditional") conditional.push(item);
 else if (kind === "accessory") accessory.push(item);
 else permitted.push(item);
 
@@ -532,7 +532,6 @@ const COLORS = {
   permitted:   [30,126,52,0.4],   // green
   conditional: [176,86,0,0.4],    // orange
   accessory:   [111,66,193,0.35], // purple
-  notPermitted:[231,76,60,0.35],  // red
   zoneOnly:    [59,130,246,0.30], // blue
   outline:     [48,48,48,1]
 };
@@ -551,21 +550,32 @@ const COLORS = {
     history.replaceState({}, "", u.toString());
   };
 
-  function zonesForLandUse(lu) {
-    const out = { permitted:[], conditional:[], accessory:[], notPermitted:[] };
-    const row = zoningData[lu] || {};
-    for (const [zone, perm] of Object.entries(row)) {
-      if (!zone) continue;
-      const kind = normalizePermission(perm);
-      if (kind === "conditional") out.conditional.push(zone);
-      else if (kind === "accessory") out.permitted.push(zone); // map accessory as permitted color
-      else if (kind === "not-permitted") out.notPermitted.push(zone);
-      else out.permitted.push(zone);
+ function zonesForLandUse(lu) {
+  // Build three clean buckets; skip "not permitted"
+  const out = { permitted: [], conditional: [], accessory: [] };
+  const row = zoningData[lu] || {};
+
+  for (const [zone, perm] of Object.entries(row)) {
+    if (!zone) continue;
+    const kind = normalizePermission(perm);
+
+    if (kind === "conditional") {
+      out.conditional.push(zone);
+    } else if (kind === "accessory") {
+      out.accessory.push(zone);      // <-- show as its own purple category
+    } else if (kind === "not-permitted") {
+      // skip entirely (don't highlight/dim)
+    } else {
+      // "permitted" (and any other fallbacks)
+      out.permitted.push(zone);
     }
-    return out;
+  }
+  return out;
+}
+
   }
 
-  const uvRendererBuckets = (permitted, conditional, accessory, notPermitted) =>
+  const uvRendererBuckets = (permitted, conditional, accessory) =>
   new UniqueValueRenderer({
     field: ZONE_FIELD,
     defaultSymbol: {
@@ -591,13 +601,8 @@ const COLORS = {
         label: "Accessory Use",
         symbol: { type: "simple-fill", color: COLORS.accessory,
           outline: { type: "simple-line", color: COLORS.outline, width: 0.5 } }
-      })),
-      ...notPermitted.map(v => ({
-        value: v,
-        label: "Not Permitted",
-        symbol: { type: "simple-fill", color: COLORS.notPermitted,
-          outline: { type: "simple-line", color: COLORS.outline, width: 0.5 } }
       }))
+    
     ]
   });
 
@@ -635,7 +640,7 @@ const all = [...new Set([
   ...sets.permitted,
   ...sets.conditional,
   ...sets.accessory,      // include accessory
-  ...sets.notPermitted
+
 ])];
 
     const where = all.length ? `${ZONE_FIELD} IN (${all.map(v=>`'${sql(v)}'`).join(",")})` : "1=0";
@@ -652,7 +657,7 @@ layer.renderer = uvRendererBuckets(
   sets.permitted,
   sets.conditional,
   sets.accessory,         // include accessory
-  sets.notPermitted
+ 
 );
 
     if (all.length) await zoomWhere(where);
