@@ -706,58 +706,78 @@ layer.renderer = uvRendererBuckets(
     }
   }
 
- // Boot
+// Boot
 view.when(async () => {
-  // Resolve a proper FeatureLayer with Zoning8 (search ALL layers, including sublayers)
-  async function resolveTargetLayer() {
-    const all = view.map.allLayers.toArray(); // includes groups/sublayers
-    for (const lyr of all) {
-      try {
-        if (lyr.type !== "feature") continue;           // must be FeatureLayer
-        if (typeof lyr.load === "function") await lyr.load();
-        const names = (lyr.fields || []).map(f => f.name.toLowerCase());
-        if (names.includes(ZONE_FIELD.toLowerCase())) return lyr;
-      } catch (e) {
-        /* ignore load errors and keep looking */
-      }
+  try {
+    // Ensure the webmap & all layers are loaded before we search them
+    await webmap.when();
+    // loadAll() awaits nested GroupLayers/MapImage sublayers, etc.
+    if (typeof webmap.loadAll === "function") {
+      await webmap.loadAll();
     }
-    return null;
+
+    // Resolve a proper FeatureLayer with Zoning8 (search ALL layers, including sublayers)
+    async function resolveTargetLayer() {
+      const all = webmap.allLayers.toArray(); // flattens group/sublayers
+      for (const lyr of all) {
+        try {
+          if (lyr.type !== "feature") continue; // need FeatureLayer for layerView.effect
+          if (typeof lyr.load === "function") await lyr.load();
+          const fields = (lyr.fields || []).map(f => (f.name || "").toLowerCase());
+          if (fields.includes(ZONE_FIELD.toLowerCase())) return lyr;
+        } catch (e) {
+          console.warn("[Map] Skip layer due to load error:", lyr?.title || lyr?.id, e);
+        }
+      }
+      return null;
+    }
+
+    layer = await resolveTargetLayer();
+
+    if (!layer) {
+      console.error("[Map] No FeatureLayer with field", ZONE_FIELD, "found in webmap", WEBMAP_ID);
+      // Optional: show a friendly placeholder in the map div
+      const el = document.getElementById("viewDiv");
+      if (el) el.innerHTML = "<div style='padding:12px;color:#b00'>Map layer with field <b>"
+          + ZONE_FIELD + "</b> not found. Check the AGOL webmap and field name.</div>";
+      return;
+    }
+
+    layerView = await view.whenLayerView(layer);
+
+    // Check highlight/dim support; if not, safely fall back to filter mode
+    const SUPPORTS_EFFECT = ("effect" in layerView) && ("filter" in layerView);
+    if (!SUPPORTS_EFFECT && !FILTER_MODE) {
+      console.warn("[Map] FeatureEffect not supported; switching to filter mode.");
+      FILTER_MODE = true;
+    }
+
+    console.log("[Map] Using layer:", layer.title || layer.id,
+                "| supports effect:", SUPPORTS_EFFECT,
+                "| mode:", FILTER_MODE ? "filter" : "highlight");
+
+    // Wire to main selectors
+    LU_SELECT?.addEventListener("change", applyLUFromMain);
+    ZD_SELECT?.addEventListener("change", applyZDFromMain);
+
+    // Initial restore from URL / main UI
+    const p = new URLSearchParams(location.search);
+    if (p.get("mode")==="filter") FILTER_MODE = true; // honor URL
+    if (p.get("zd")) {
+      ZD_SELECT && (ZD_SELECT.value = p.get("zd"));
+      await applyZDFromMain();
+    } else if (p.get("lu")) {
+      LU_SELECT && (LU_SELECT.value = p.get("lu"));
+      await applyLUFromMain();
+    }
+
+    await restoreAPNFromURL();
+
+  } catch (err) {
+    console.error("[Map] Fatal init error:", err);
+    const el = document.getElementById("viewDiv");
+    if (el) el.innerHTML = "<div style='padding:12px;color:#b00'>Map failed to load. See console for details.</div>";
   }
-
-  layer = await resolveTargetLayer();
-  if (!layer) {
-    console.warn("No FeatureLayer with Zoning8 found in the webmap.");
-    return;
-  }
-
-  layerView = await view.whenLayerView(layer);
-
-  // Check if highlight/dim is supported on this layerView
-  const SUPPORTS_EFFECT = "effect" in layerView && "filter" in layerView;
-  if (!SUPPORTS_EFFECT && !FILTER_MODE) {
-    console.warn("[Map] FeatureEffect not supported for this layerView; switching to filter mode.");
-    FILTER_MODE = true; // fallback so the user still sees something
-  }
-
-  console.log("[Map] Using layer:", layer.title || layer.id, 
-              "| supports effect:", SUPPORTS_EFFECT, 
-              "| mode:", FILTER_MODE ? "filter" : "highlight");
-
-  // Wire to main selectors
-  LU_SELECT?.addEventListener("change", applyLUFromMain);
-  ZD_SELECT?.addEventListener("change", applyZDFromMain);
-
-  // Initial restore from URL/main UI
-  const p = new URLSearchParams(location.search);
-  if (p.get("mode")==="filter") FILTER_MODE = true; // honor URL
-  if (p.get("zd")) {
-    ZD_SELECT && (ZD_SELECT.value = p.get("zd"));
-    await applyZDFromMain();
-  } else if (p.get("lu")) {
-    LU_SELECT && (LU_SELECT.value = p.get("lu"));
-    await applyLUFromMain();
-  }
-  await restoreAPNFromURL();
 });
 
 </script>
