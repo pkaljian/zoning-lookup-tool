@@ -305,33 +305,33 @@ function getDefinition(useName) {
   }
 
   // === Build dropdowns from window.zoningData (single source of truth) ===
-  function populateDropdowns() {
-    const landUseSelect = document.getElementById('landUseSelect');
-    const zoneSelect = document.getElementById('zoneSelect');
-    if (!landUseSelect || !zoneSelect) return;
+function populateDropdowns() {
+  const landUseSelect = document.getElementById('landUseSelect');
+  const zoneSelect = document.getElementById('zoneSelect');
+  if (!landUseSelect || !zoneSelect) return;
 
-    const data = (window.zoningData && typeof window.zoningData === 'object') ? window.zoningData : {};
-    const landUses = Object.keys(data).sort();
-    const zones = Array.from(new Set(Object.values(data).flatMap(row => Object.keys(row || {}))))
-      .filter(Boolean)
-      .sort();
+  const data = (window.zoningData && typeof window.zoningData === 'object') ? window.zoningData : {};
+  const landUses = Object.keys(data).sort();
+  const zones = Array.from(new Set(Object.values(data).flatMap(row => Object.keys(row || {}))))
+    .filter(Boolean)
+    .sort();
 
-    landUseSelect.innerHTML = '<option value="">Select a land use...</option>';
-    zoneSelect.innerHTML = '<option value="">Select a zone...</option>';
+  landUseSelect.innerHTML = '<option value="">Select a land use...</option>';
+  zoneSelect.innerHTML = '<option value="">Select a zone...</option>';
 
-    landUses.forEach(use => {
-      const opt = document.createElement('option');
-      opt.value = use;
-      opt.textContent = use;
-      landUseSelect.appendChild(opt);
-    });
-    zones.forEach(zone => {
-      const opt = document.createElement('option');
-      opt.value = zone;
-      opt.textContent = zone;
-      zoneSelect.appendChild(opt);
-    });
-  }
+  landUses.forEach(use => {
+    const opt = document.createElement('option');
+    opt.value = use;
+    opt.textContent = use;
+    landUseSelect.appendChild(opt);
+  });
+  zones.forEach(zone => {
+    const opt = document.createElement('option');
+    opt.value = zone;
+    opt.textContent = zone;
+    zoneSelect.appendChild(opt);
+  });
+}
 
 function normalizePermission(permission) {
   const p = String(permission || "").toLowerCase().trim();
@@ -354,56 +354,95 @@ function normalizePermission(permission) {
   // Fallback = permitted
   return "permitted";
 }
-}
 
 function getPermissionClass(permission) {
   return normalizePermission(permission);
 }
 
-  // === Search: Land Use ===
-  function searchByLandUse() {
-    const selectedUse = document.getElementById('landUseSelect').value;
-    const results = document.getElementById('results');
+// === Search: Land Use ===
+function searchByLandUse() {
+  const selectedUse = document.getElementById('landUseSelect').value;
+  const results = document.getElementById('results');
 
-    if (!selectedUse) {
-      results.innerHTML = '<p class="no-results">Please select a land use first.</p>';
-      return;
-    }
-
-    const useData = (window.zoningData || {})[selectedUse];
-    if (!useData) {
-      results.innerHTML = `<p class="no-results">No data found for "${htmlEscape(selectedUse)}".</p>`;
-      return;
-    }
-
-    let html = `<h3>Where "${htmlEscape(selectedUse)}" is allowed:</h3>`;
-
-    // Definition banner
-    const def = getDefinition(selectedUse);
-    if (def) {
-      html += `
-        <div class="definition-banner">
-          <strong>Definition:</strong> ${htmlEscape(def)}
-        </div>`;
-    }
-
-    const permitted = [], conditional = [], accessory = [];
-  Object.entries(useData).forEach(([zone, permission]) => {
-  const item = { zone, permission };
-  const kind = normalizePermission(permission);
-
-  if (kind === "not-permitted") {
-    // skip entirely
+  if (!selectedUse) {
+    results.innerHTML = '<p class="no-results">Please select a land use first.</p>';
     return;
-  } else if (kind === "conditional") {
-    conditional.push(item);
-  } else if (kind === "accessory") {
-    accessory.push(item);
-  } else {
-    // treat everything else as permitted
-    permitted.push(item);
   }
-});
+
+  const useData = (window.zoningData || {})[selectedUse];
+  if (!useData) {
+    results.innerHTML = `<p class="no-results">No data found for "${htmlEscape(selectedUse)}".</p>`;
+    return;
+  }
+
+  let html = `<h3>Where "${htmlEscape(selectedUse)}" is allowed:</h3>`;
+
+  // Definition banner
+  const def = getDefinition(selectedUse);
+  if (def) {
+    html += `
+      <div class="definition-banner">
+        <strong>Definition:</strong> ${htmlEscape(def)}
+      </div>`;
+  }
+
+  const permitted = [], conditional = [], accessory = [];
+  Object.entries(useData).forEach(([zone, permission]) => {
+    const item = { zone, permission };
+    const kind = normalizePermission(permission);
+
+    if (kind === "not-permitted") {
+      // skip entirely
+      return;
+    } else if (kind === "conditional") {
+      conditional.push(item);
+    } else if (kind === "accessory") {
+      accessory.push(item);
+    } else {
+      permitted.push(item);
+    }
+  });
+
+  // optional: keep zones alphabetized inside each bucket
+  const byZone = (a, b) => a.zone.localeCompare(b.zone);
+  permitted.sort(byZone); conditional.sort(byZone); accessory.sort(byZone);
+
+  if (permitted.length) {
+    html += '<h4 class="section-header permitted">Permitted:</h4>';
+    permitted.forEach(item => {
+      html += `<div class="result-item permitted">
+        <span class="zone-name">${htmlEscape(item.zone)}</span>
+        <div class="permission-detail">${htmlEscape(item.permission)}</div>
+      </div>`;
+    });
+  }
+  if (conditional.length) {
+    html += '<h4 class="section-header conditional">Conditional Use Permit Required:</h4>';
+    conditional.forEach(item => {
+      html += `<div class="result-item conditional">
+        <span class="zone-name">${htmlEscape(item.zone)}</span>
+        <div class="permission-detail">${htmlEscape(item.permission)}</div>
+      </div>`;
+    });
+  }
+  if (accessory.length) {
+    html += '<h4 class="section-header accessory">Accessory Use:</h4>';
+    accessory.forEach(item => {
+      html += `<div class="result-item accessory">
+        <span class="zone-name">${htmlEscape(item.zone)}</span>
+        <div class="permission-detail">${htmlEscape(item.permission)}</div>
+      </div>`;
+    });
+  }
+
+  // If all three were empty (edge case), show a friendly message
+  if (!permitted.length && !conditional.length && !accessory.length) {
+    html += '<p class="no-results">This use is not allowed in any standard zone.</p>';
+  }
+
+  results.innerHTML = html;
+}
+
 
     if (permitted.length) {
   html += '<h4 class="section-header permitted">Permitted:</h4>';
