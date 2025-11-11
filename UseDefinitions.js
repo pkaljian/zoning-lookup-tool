@@ -6,6 +6,7 @@
 window.useDefinitions = {
   "Abut": "Adjoin or border on.",
   "Adult Day Program": "Any community-based facility or program that provides care to persons 18 years of age or older in need of personal services, supervision, or assistance essential for sustaining the activities of daily living or for the protection of these individuals on less than a 24-hour basis.",
+"Adult Oriented Business": "See <a href='https://petaluma.municipal.codes/ZoningOrds/10' target='_blank' rel='noopener noreferrer'>Chapter 10 of the Zoning Ordinance</a>."
   "Alcoholic Beverage Establishment": "A commercial and non-commercial establishment wherein alcoholic beverages are sold, served, or given away for consumption on the premises, excluding full-service restaurants. Typical alcoholic beverage establishments include but are not limited to the following recognized types of establishments: bars, cocktail lounges, ballrooms, dance bars, piano bars, billiard or game parlors, bowling alleys and nightclubs.",
   "Alley": "A public or private way which affords only secondary access to abutting property.",
   "Arborist": "1) A person currently certified by the Western Article of the International Society of Arboriculture as an expert on the care of trees; 2) a consulting arborist who satisfies the requirements of the American Society of Consulting Arborists; or 3) other qualified professionals who the Director determines have gained through experience the qualifications to identify, remove, or replace trees.",
