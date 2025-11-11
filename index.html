@@ -375,15 +375,22 @@ function getPermissionClass(permission) {
     }
 
     const permitted = [], conditional = [], accessory = [];
-    Object.entries(useData).forEach(([zone, permission]) => {
-      const item = { zone, permission };
-const kind = normalizePermission(permission);
+  Object.entries(useData).forEach(([zone, permission]) => {
+  const item = { zone, permission };
+  const kind = normalizePermission(permission);
 
-if (kind === "conditional") conditional.push(item);
-else if (kind === "accessory") accessory.push(item);
-else permitted.push(item);
-
-    });
+  if (kind === "not-permitted") {
+    // skip entirely
+    return;
+  } else if (kind === "conditional") {
+    conditional.push(item);
+  } else if (kind === "accessory") {
+    accessory.push(item);
+  } else {
+    // treat everything else as permitted
+    permitted.push(item);
+  }
+});
 
     if (permitted.length) {
   html += '<h4 class="section-header permitted">Permitted:</h4>';
