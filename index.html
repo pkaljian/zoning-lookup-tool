@@ -377,7 +377,6 @@ function searchByLandUse() {
 
   let html = `<h3>Where "${htmlEscape(selectedUse)}" is allowed:</h3>`;
 
-  // Definition banner
   const def = getDefinition(selectedUse);
   if (def) {
     html += `
@@ -391,19 +390,12 @@ function searchByLandUse() {
     const item = { zone, permission };
     const kind = normalizePermission(permission);
 
-    if (kind === "not-permitted") {
-      // skip entirely
-      return;
-    } else if (kind === "conditional") {
-      conditional.push(item);
-    } else if (kind === "accessory") {
-      accessory.push(item);
-    } else {
-      permitted.push(item);
-    }
+    if (kind === "not-permitted") return;
+    if (kind === "conditional") conditional.push(item);
+    else if (kind === "accessory") accessory.push(item);
+    else permitted.push(item);
   });
 
-  // optional: keep zones alphabetized inside each bucket
   const byZone = (a, b) => a.zone.localeCompare(b.zone);
   permitted.sort(byZone); conditional.sort(byZone); accessory.sort(byZone);
 
@@ -435,45 +427,12 @@ function searchByLandUse() {
     });
   }
 
-  // If all three were empty (edge case), show a friendly message
   if (!permitted.length && !conditional.length && !accessory.length) {
     html += '<p class="no-results">This use is not allowed in any standard zone.</p>';
   }
 
   results.innerHTML = html;
 }
-
-
-    if (permitted.length) {
-  html += '<h4 class="section-header permitted">Permitted:</h4>';
-        permitted.forEach(item => {
-        html += `<div class="result-item permitted">
-          <span class="zone-name">${htmlEscape(item.zone)}</span>
-          <div class="permission-detail">${htmlEscape(item.permission)}</div>
-        </div>`;
-      });
-    }
-    if (conditional.length) {
-  html += '<h4 class="section-header conditional">Conditional Use Permit Required:</h4>';
-      conditional.forEach(item => {
-        html += `<div class="result-item conditional">
-          <span class="zone-name">${htmlEscape(item.zone)}</span>
-          <div class="permission-detail">${htmlEscape(item.permission)}</div>
-        </div>`;
-      });
-    }
-    if (accessory.length) {
-  html += '<h4 class="section-header accessory">Accessory Use:</h4>';
-      accessory.forEach(item => {
-        html += `<div class="result-item accessory">
-          <span class="zone-name">${htmlEscape(item.zone)}</span>
-          <div class="permission-detail">${htmlEscape(item.permission)}</div>
-        </div>`;
-      });
-    }
-
-    results.innerHTML = html;
-  }
 
   // === Search: Zone ===
   function searchByZone() {
