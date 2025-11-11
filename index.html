@@ -334,13 +334,26 @@ function getDefinition(useName) {
   }
 
 function normalizePermission(permission) {
-  const p = (permission || "").toLowerCase().trim();
-  if (!p || p === "not permitted" || p === "np") return "not-permitted";
-  if (p.startsWith("cup") || p.includes("conditional")) return "conditional";
-  if (p.startsWith("a") || p.includes("accessory")) return "accessory";
-  // fallback
-  if (p === "permitted" || p === "p") return "permitted";
+  const p = String(permission || "").toLowerCase().trim();
+
+  // Not permitted / prohibited
+  if (!p || /^(np|not\s*permitted|prohibited)\b/.test(p)) return "not-permitted";
+
+  // Conditional bucket (evaluate BEFORE accessory/permitted)
+  // Handles: "Minor Use Permit", "MUP", "Use Permit", "CUP", "Conditional"
+  if (/\b(mup|minor\W*use\W*permit|use\W*permit|cup|conditional)\b/.test(p)) {
+    return "conditional";
+  }
+
+  // Accessory bucket
+  if (/\b(accessory|acc\.)\b/.test(p) || p.startsWith("a")) return "accessory";
+
+  // Explicit permitted
+  if (/\b(permitted|^p$)\b/.test(p)) return "permitted";
+
+  // Fallback = permitted
   return "permitted";
+}
 }
 
 function getPermissionClass(permission) {
