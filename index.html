@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="https://js.arcgis.com/4.30/@arcgis/core/assets/esri/themes/light/main.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zoning Lookup Tool</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* ── Language toggle bar ── */
+        .lang-bar {
+            display: flex;
+            justify-content: flex-end;
+            max-width: 900px;
+            margin: 0 auto 10px;
+            gap: 6px;
+        }
+        .lang-btn {
+            background: rgba(255,255,255,0.25);
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.6);
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-size: 0.88em;
+            font-weight: 600;
+            cursor: pointer;
+            letter-spacing: 0.04em;
+            transition: background 0.2s, border-color 0.2s;
+        }
+        .lang-btn.active,
+        .lang-btn:hover {
+            background: rgba(255,255,255,0.85);
+            color: #5a4295;
+            border-color: #fff;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: rgba(255,255,255,0.95);
+            border-radius: 15px;
+            padding: 40px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+        }
+
+        h1 { text-align: center; color: #2c3e50; margin-bottom: 10px; font-size: 2.5em; font-weight: 300; }
+        .subtitle { text-align: center; color: #7f8c8d; margin-bottom: 40px; font-size: 1.1em; }
+
+        .query-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border-left: 5px solid #3498db;
+        }
+        .query-title { font-size: 1.3em; color: #2c3e50; margin-bottom: 20px; font-weight: 600; }
+        .query-form { display: flex; flex-wrap: wrap; align-items: center; gap: 15px; }
+        .query-text { font-size: 1.1em; color: #34495e; }
+
+        select {
+            padding: 10px 15px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 1em;
+            background: white;
+            min-width: 200px;
+            transition: border-color 0.3s ease;
+        }
+        select:focus { outline: none; border-color: #3498db; }
+
+        button {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1em;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(52,152,219,0.4); }
+
+        .results {
+            background: white;
+            border-radius: 10px;
+            padding: 25px;
+            margin-top: 30px;
+            border: 1px solid #ecf0f1;
+            min-height: 100px;
+        }
+        .results h3 { color: #2c3e50; margin-bottom: 15px; font-size: 1.2em; }
+
+        .result-item {
+            background: #f1f2f6;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #27ae60;
+        }
+        .result-item.conditional { border-left-color: #f39c12; }
+        .result-item.not-permitted { border-left-color: #e74c3c; }
+        .result-item.accessory { border-left-color: #9b59b6; }
+
+        .zone-name { font-weight: bold; color: #2c3e50; }
+        .permission-detail { margin-top: 5px; color: #555; font-size: 0.95em; }
+
+        .results .section-header {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-weight: 600;
+        }
+        .results .section-header.permitted   { background: #eaf7ee; color: #1e7e34; }
+        .results .section-header.conditional { background: #fff3e0; color: #b05600; }
+        .results .section-header.accessory   { background: #f3e9fb; color: #6f42c1; }
+
+        .loading { text-align: center; color: #7f8c8d; font-style: italic; }
+        .no-results { text-align: center; color: #e74c3c; font-style: italic; }
+
+        .definition-banner {
+            background: #fffbe7;
+            border: 1px solid #ffd75a;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        /* ── Map panel ── */
+        #map-panel {
+            border-top: 1px solid #e5e7eb;
+            padding: .75rem 0;
+            margin-top: 1rem;
+        }
+
+        /* ── Map toolbar (address lookup + PDF export) ── */
+        .map-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .map-toolbar-label {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #2c3e50;
+            white-space: nowrap;
+        }
+        #addressInput {
+            flex: 1;
+            min-width: 180px;
+            padding: 9px 14px;
+            border: 2px solid #bdc3c7;
+            border-radius: 8px;
+            font-size: 0.95em;
+            transition: border-color 0.25s;
+        }
+        #addressInput:focus { outline: none; border-color: #3498db; }
+        #addressInput::placeholder { color: #aaa; }
+
+        #addressSearchBtn {
+            padding: 9px 18px;
+            font-size: 0.95em;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            white-space: nowrap;
+        }
+
+        #downloadMapBtn {
+            padding: 9px 18px;
+            font-size: 0.95em;
+            background: linear-gradient(135deg, #27ae60, #1e8449);
+            display: none;   /* hidden until a search is done */
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
+        #downloadMapBtn.visible { display: inline-flex; }
+
+        #map-status {
+            font-size: 0.82em;
+            color: #7f8c8d;
+            font-style: italic;
+            min-height: 18px;
+        }
+
+        #viewDiv {
+            height: 520px;
+            width: 100%;
+            border: 1px solid #e5e7eb;
+            border-radius: .5rem;
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
+            .query-form { flex-direction: column; align-items: stretch; }
+            select { min-width: auto; width: 100%; }
+            .map-toolbar { flex-direction: column; align-items: stretch; }
+            #addressInput { min-width: auto; }
+        }
+    </style>
+
+    <script src="ZoningData_not_permitted.js"></script>
+    <script src="UseDefinitions.js"></script>
+</head>
+<body>
+
+<!-- Language toggle -->
+<div class="lang-bar">
+    <button class="lang-btn active" id="btnEN" onclick="setLang('en')">EN</button>
+    <button class="lang-btn"        id="btnES" onclick="setLang('es')">ES</button>
+</div>
+
+<div class="container">
+    <h1 data-i18n="title">Zoning Lookup Tool</h1>
+    <p class="subtitle" data-i18n="subtitle">Find zoning permissions for land uses quickly and easily</p>
+
+    <!-- Disclaimer -->
+    <div style="background:#fff3cd;border:1px solid #ffeaa7;border-radius:8px;padding:15px;margin-bottom:30px;border-left:5px solid #fdcb6e;">
+        <strong data-i18n="disclaimer_label">⚠️ Important Disclaimer:</strong>
+        <span data-i18n="disclaimer_body"> This tool provides general zoning information for reference purposes only. Always verify requirements with the Planning Department before making final development decisions. Zoning regulations may have additional requirements, recent updates, or site-specific considerations not reflected in this tool.</span>
+        <br><br>
+        <strong data-i18n="resources_label">📋 Additional Resources:</strong>
+        <a href="https://cityofpetaluma.org/zoning-map/" target="_blank" style="color:#2980b9;text-decoration:none;" data-i18n="link_zoning_map">View Official Zoning Map</a> |
+        <a href="https://petaluma.municipal.codes/SmartCode/2" target="_blank" style="color:#2980b9;text-decoration:none;" data-i18n="link_smartcode">View Central Petaluma Area Zoning Map and "Smart Code"</a>
+    </div>
+
+    <!-- Query 1: by land use -->
+    <div class="query-section">
+        <div class="query-title" data-i18n="q1_title">Where can I put a specific use?</div>
+        <div class="query-form">
+            <span class="query-text" data-i18n="q1_prefix">Where can I put a</span>
+            <select id="landUseSelect"><option value="" data-i18n="select_use">Select a land use...</option></select>
+            <span class="query-text">?</span>
+        </div>
+    </div>
+    <div style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;padding:10px;margin-top:15px;font-size:0.9em;color:#6c757d;">
+        <span data-i18n="help_definitions">Need help understanding a land use?</span>
+        <a href="https://petaluma.municipal.codes/ZoningOrds/28" target="_blank" style="color:#2980b9;text-decoration:none;" data-i18n="link_definitions">Find land use definitions here</a>
+    </div>
+
+    <div style="text-align:center;font-size:1.2em;color:#7f8c8d;margin:20px 0;" data-i18n="or_divider">— OR —</div>
+
+    <!-- Query 2: by zone -->
+    <div class="query-section">
+        <div class="query-title" data-i18n="q2_title">What's allowed in a specific zone?</div>
+        <div class="query-form">
+            <span class="query-text" data-i18n="q2_prefix">What's allowed in</span>
+            <select id="zoneSelect"><option value="" data-i18n="select_zone">Select a zone...</option></select>
+            <span class="query-text" data-i18n="q2_suffix">zoning?</span>
+        </div>
+    </div>
+    <div style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:6px;padding:10px;margin-top:15px;font-size:0.9em;color:#6c757d;">
+        <span data-i18n="help_pud">Properties in PUD/PCD zones may have additional requirements.</span>
+        <a href="https://cityofpetaluma.org/pud-and-pcd-guidelines/" target="_blank" style="color:#2980b9;text-decoration:none;" data-i18n="link_pud">Check specific plan guidelines</a>
+    </div>
+
+    <!-- Results -->
+    <div class="results" id="results">
+        <p class="loading" data-i18n="results_placeholder">Select a query above to get started</p>
+    </div>
+
+    <!-- Map panel -->
+    <section id="map-panel">
+
+        <!-- Address lookup + PDF export toolbar -->
+        <div class="map-toolbar">
+            <span class="map-toolbar-label" data-i18n="address_label">Address Lookup:</span>
+            <input type="text" id="addressInput" data-i18n-placeholder="address_placeholder" placeholder="Enter a Petaluma address…" />
+            <button id="addressSearchBtn" onclick="geocodeAddress()" data-i18n="address_btn">Search Address</button>
+            <button id="downloadMapBtn" onclick="exportMapPDF()" class="visible" data-i18n="export_btn">⬇ Download Map (PDF)</button>
+        </div>
+        <div id="map-status"></div>
+
+        <div id="viewDiv"></div>
+    </section>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TRANSLATIONS
+══════════════════════════════════════════════ -->
+<script>
+const TRANSLATIONS = {
+  en: {
+    title:               "Zoning Lookup Tool",
+    subtitle:            "Find zoning permissions for land uses quickly and easily",
+    disclaimer_label:    "⚠️ Important Disclaimer:",
+    disclaimer_body:     " This tool provides general zoning information for reference purposes only. Always verify requirements with the Planning Department before making final development decisions. Zoning regulations may have additional requirements, recent updates, or site-specific considerations not reflected in this tool.",
+    resources_label:     "📋 Additional Resources:",
+    link_zoning_map:     "View Official Zoning Map",
+    link_smartcode:      'View Central Petaluma Area Zoning Map and "Smart Code"',
+    q1_title:            "Where can I put a specific use?",
+    q1_prefix:           "Where can I put a",
+    select_use:          "Select a land use...",
+    help_definitions:    "Need help understanding a land use? ",
+    link_definitions:    "Find land use definitions here",
+    or_divider:          "— OR —",
+    q2_title:            "What's allowed in a specific zone?",
+    q2_prefix:           "What's allowed in",
+    select_zone:         "Select a zone...",
+    q2_suffix:           "zoning?",
+    help_pud:            "Properties in PUD/PCD zones may have additional requirements. ",
+    link_pud:            "Check specific plan guidelines",
+    results_placeholder: "Select a query above to get started",
+    address_label:       "Address Lookup:",
+    address_placeholder: "Enter a Petaluma address…",
+    address_btn:         "Search Address",
+    export_btn:          "⬇ Download Map (PDF)",
+    // results UI strings
+    results_lu_header:   'Where "{use}" is allowed:',
+    results_zone_header: "What's allowed in {zone} zoning:",
+    def_label:           "Definition:",
+    sec_permitted:       "Permitted:",
+    sec_permitted_uses:  "Permitted Uses:",
+    sec_conditional:     "Conditional Use Permit Required:",
+    sec_accessory:       "Accessory Use:",
+    sec_accessory_uses:  "Accessory Uses:",
+    no_use:              "Please select a land use first.",
+    no_data:             'No data found for "{use}".',
+    no_standard:         "This use is not allowed in any standard zone.",
+    no_zone:             "Please select a zone first.",
+    no_allowed:          "No uses are specifically allowed in this zone.",
+    // map status
+    addr_searching:      "Searching for address…",
+    addr_not_found:      "Address not found. Try a more specific address.",
+    addr_error:          "Geocoding error. Please try again.",
+    export_generating:   "Generating PDF…",
+    export_done:         "Map exported.",
+    export_error:        "Export failed. Please try again.",
+  },
+  es: {
+    title:               "Herramienta de Consulta de Zonificación",
+    subtitle:            "Encuentre permisos de zonificación para usos de suelo de forma rápida y sencilla",
+    disclaimer_label:    "⚠️ Aviso Importante:",
+    disclaimer_body:     " Esta herramienta proporciona información general de zonificación solo con fines de referencia. Verifique siempre los requisitos con el Departamento de Planificación antes de tomar decisiones finales de desarrollo. Las regulaciones de zonificación pueden tener requisitos adicionales, actualizaciones recientes o consideraciones específicas del sitio que no se reflejan en esta herramienta.",
+    resources_label:     "📋 Recursos Adicionales:",
+    link_zoning_map:     "Ver Mapa Oficial de Zonificación",
+    link_smartcode:      'Ver Mapa de Zonificación del Área Central de Petaluma y "Smart Code"',
+    q1_title:            "¿Dónde puedo ubicar un uso específico?",
+    q1_prefix:           "¿Dónde puedo ubicar",
+    select_use:          "Seleccione un uso de suelo...",
+    help_definitions:    "¿Necesita ayuda para entender un uso de suelo? ",
+    link_definitions:    "Encuentre definiciones de usos de suelo aquí",
+    or_divider:          "— O —",
+    q2_title:            "¿Qué se permite en una zona específica?",
+    q2_prefix:           "¿Qué se permite en la zona",
+    select_zone:         "Seleccione una zona...",
+    q2_suffix:           "?",
+    help_pud:            "Las propiedades en zonas PUD/PCD pueden tener requisitos adicionales. ",
+    link_pud:            "Consulte las pautas del plan específico",
+    results_placeholder: "Seleccione una consulta arriba para comenzar",
+    address_label:       "Búsqueda por Dirección:",
+    address_placeholder: "Ingrese una dirección en Petaluma…",
+    address_btn:         "Buscar Dirección",
+    export_btn:          "⬇ Descargar Mapa (PDF)",
+    // results UI
+    results_lu_header:   'Dónde se permite "{use}":',
+    results_zone_header: "Qué se permite en la zona {zone}:",
+    def_label:           "Definición:",
+    sec_permitted:       "Permitido:",
+    sec_permitted_uses:  "Usos Permitidos:",
+    sec_conditional:     "Se Requiere Permiso de Uso Condicional:",
+    sec_accessory:       "Uso Accesorio:",
+    sec_accessory_uses:  "Usos Accesorios:",
+    no_use:              "Por favor seleccione un uso de suelo primero.",
+    no_data:             'No se encontraron datos para "{use}".',
+    no_standard:         "Este uso no está permitido en ninguna zona estándar.",
+    no_zone:             "Por favor seleccione una zona primero.",
+    no_allowed:          "No hay usos específicamente permitidos en esta zona.",
+    // map status
+    addr_searching:      "Buscando dirección…",
+    addr_not_found:      "Dirección no encontrada. Intente con una dirección más específica.",
+    addr_error:          "Error de geocodificación. Por favor intente de nuevo.",
+    export_generating:   "Generando PDF…",
+    export_done:         "Mapa exportado.",
+    export_error:        "Error al exportar. Por favor intente de nuevo.",
+  }
+};
+
+let currentLang = 'en';
+
+function t(key, vars) {
+  let str = (TRANSLATIONS[currentLang] || TRANSLATIONS.en)[key] || key;
+  if (vars) Object.entries(vars).forEach(([k,v]) => { str = str.replace(`{${k}}`, v); });
+  return str;
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  document.documentElement.lang = lang;
+
+  // Toggle button states
+  document.getElementById('btnEN').classList.toggle('active', lang === 'en');
+  document.getElementById('btnES').classList.toggle('active', lang === 'es');
+
+  // Update all data-i18n elements
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    const val = t(key);
+    // Don't clobber child nodes for containers that also hold links
+    if (el.children.length === 0) {
+      el.textContent = val;
+    }
+  });
+
+  // Placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+    el.placeholder = t(el.getAttribute('data-i18n-placeholder'));
+  });
+
+  // Re-render results if there's an active selection
+  const lu = document.getElementById('landUseSelect')?.value;
+  const zd = document.getElementById('zoneSelect')?.value;
+  if (lu) searchByLandUse();
+  else if (zd) searchByZone();
+  else {
+    document.getElementById('results').innerHTML =
+      `<p class="loading">${t('results_placeholder')}</p>`;
+  }
+
+  // Re-render dropdowns placeholders
+  const luSel = document.getElementById('landUseSelect');
+  const zdSel = document.getElementById('zoneSelect');
+  if (luSel && luSel.options[0]) luSel.options[0].textContent = t('select_use');
+  if (zdSel && zdSel.options[0]) zdSel.options[0].textContent = t('select_zone');
+}
+</script>
+
+<!-- ══════════════════════════════════════════════
+     ZONING LOGIC
+══════════════════════════════════════════════ -->
+<script>
+function getDefinition(useName) {
+  const dict = window.useDefinitions || {};
+  if (!useName) return "";
+  if (dict[useName]) return dict[useName];
+  const normalize = s => String(s).toLowerCase().replace(/\band\b/g,'&').replace(/&/g,'and').replace(/[\/,–—\-]/g,' ').replace(/\s+/g,' ').trim();
+  const normKey = normalize(useName);
+  if (!window.__defsIndex) {
+    window.__defsIndex = {};
+    for (const k of Object.keys(dict)) window.__defsIndex[normalize(k)] = k;
+  }
+  const match = window.__defsIndex[normKey];
+  if (match) return dict[match];
+  for (const [k, v] of Object.entries(dict)) {
+    const nk = normalize(k);
+    if (nk.includes(normKey) || normKey.includes(nk)) return v;
+  }
+  return "";
+}
+
+function htmlEscape(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function populateDropdowns() {
+  const luSel = document.getElementById('landUseSelect');
+  const zdSel = document.getElementById('zoneSelect');
+  if (!luSel || !zdSel) return;
+  const data = (window.zoningData && typeof window.zoningData === 'object') ? window.zoningData : {};
+  const landUses = Object.keys(data).sort();
+  const zones = Array.from(new Set(Object.values(data).flatMap(row => Object.keys(row || {})))).filter(Boolean).sort();
+
+  luSel.innerHTML = `<option value="">${t('select_use')}</option>`;
+  zdSel.innerHTML = `<option value="">${t('select_zone')}</option>`;
+
+  landUses.forEach(use => { const o = document.createElement('option'); o.value = use; o.textContent = use; luSel.appendChild(o); });
+  zones.forEach(zone   => { const o = document.createElement('option'); o.value = zone; o.textContent = zone; zdSel.appendChild(o); });
+}
+
+// Expose so map module can call it
+window.normalizePermission = function(permission) {
+  const p = String(permission || "").toLowerCase().trim();
+  if (!p || /^(np|not\s*permitted|prohibited)\b/.test(p)) return "not-permitted";
+  if (/\b(mup|minor\W*use\W*permit|use\W*permit|cup|conditional)\b/.test(p)) return "conditional";
+  if (/\b(accessory|acc\.)\b/.test(p) || p.startsWith("a")) return "accessory";
+  if (/\b(permitted|^p$)\b/.test(p)) return "permitted";
+  return "permitted";
+};
+const normalizePermission = window.normalizePermission;
+
+function getPermissionClass(permission) { return normalizePermission(permission); }
+
+function searchByLandUse() {
+  const selectedUse = document.getElementById('landUseSelect').value;
+  const results = document.getElementById('results');
+  if (!selectedUse) { results.innerHTML = `<p class="no-results">${t('no_use')}</p>`; return; }
+  const useData = (window.zoningData || {})[selectedUse];
+  if (!useData) { results.innerHTML = `<p class="no-results">${t('no_data', {use: htmlEscape(selectedUse)})}</p>`; return; }
+
+  let html = `<h3>${t('results_lu_header', {use: htmlEscape(selectedUse)})}</h3>`;
+  const def = getDefinition(selectedUse);
+  if (def) html += `<div class="definition-banner"><strong>${t('def_label')}</strong> ${def}</div>`;
+
+  const permitted = [], conditional = [], accessory = [];
+  Object.entries(useData).forEach(([zone, permission]) => {
+    const kind = normalizePermission(permission);
+    if (kind === "not-permitted") return;
+    const item = { zone, permission };
+    if (kind === "conditional") conditional.push(item);
+    else if (kind === "accessory") accessory.push(item);
+    else permitted.push(item);
+  });
+
+  const byZone = (a,b) => a.zone.localeCompare(b.zone);
+  permitted.sort(byZone); conditional.sort(byZone); accessory.sort(byZone);
+
+  if (permitted.length) {
+    html += `<h4 class="section-header permitted">${t('sec_permitted')}</h4>`;
+    permitted.forEach(item => { html += `<div class="result-item permitted"><span class="zone-name">${htmlEscape(item.zone)}</span><div class="permission-detail">${htmlEscape(item.permission)}</div></div>`; });
+  }
+  if (conditional.length) {
+    html += `<h4 class="section-header conditional">${t('sec_conditional')}</h4>`;
+    conditional.forEach(item => { html += `<div class="result-item conditional"><span class="zone-name">${htmlEscape(item.zone)}</span><div class="permission-detail">${htmlEscape(item.permission)}</div></div>`; });
+  }
+  if (accessory.length) {
+    html += `<h4 class="section-header accessory">${t('sec_accessory')}</h4>`;
+    accessory.forEach(item => { html += `<div class="result-item accessory"><span class="zone-name">${htmlEscape(item.zone)}</span><div class="permission-detail">${htmlEscape(item.permission)}</div></div>`; });
+  }
+  if (!permitted.length && !conditional.length && !accessory.length) html += `<p class="no-results">${t('no_standard')}</p>`;
+
+  results.innerHTML = html;
+  showDownloadBtn();
+}
+
+function searchByZone() {
+  const selectedZone = document.getElementById('zoneSelect').value;
+  const results = document.getElementById('results');
+  if (!selectedZone) { results.innerHTML = `<p class="no-results">${t('no_zone')}</p>`; return; }
+
+  let html = `<h3>${t('results_zone_header', {zone: htmlEscape(selectedZone)})}</h3>`;
+  const permitted = [], conditional = [], accessory = [];
+
+  Object.entries(window.zoningData || {}).forEach(([landUse, zones]) => {
+    const permission = zones[selectedZone];
+    const kind = normalizePermission(permission);
+    if (kind === "not-permitted") return;
+    const item = { landUse, permission };
+    if (kind === "conditional") conditional.push(item);
+    else if (kind === "accessory") accessory.push(item);
+    else permitted.push(item);
+  });
+
+  const landUseSpan = (lu) => {
+    const def = getDefinition(lu);
+    const escLu = htmlEscape(lu), escDef = htmlEscape(def);
+    return def ? `<span class="zone-name" title="${escDef}" aria-label="${escDef}">${escLu}</span>`
+               : `<span class="zone-name">${escLu}</span>`;
+  };
+
+  if (permitted.length) {
+    html += `<h4 class="section-header permitted">${t('sec_permitted_uses')}</h4>`;
+    permitted.forEach(item => { html += `<div class="result-item permitted">${landUseSpan(item.landUse)}<div class="permission-detail">${htmlEscape(item.permission)}</div></div>`; });
+  }
+  if (conditional.length) {
+    html += `<h4 class="section-header conditional">${t('sec_conditional')}</h4>`;
+    conditional.forEach(item => { html += `<div class="result-item conditional">${landUseSpan(item.landUse)}<div class="permission-detail">${htmlEscape(item.permission)}</div></div>`; });
+  }
+  if (accessory.length) {
+    html += `<h4 class="section-header accessory">${t('sec_accessory_uses')}</h4>`;
+    accessory.forEach(item => { html += `<div class="result-item accessory">${landUseSpan(item.landUse)}<div class="permission-detail">${htmlEscape(item.permission)}</div></div>`; });
+  }
+  if (!permitted.length && !conditional.length && !accessory.length) html += `<p class="no-results">${t('no_allowed')}</p>`;
+
+  results.innerHTML = html;
+  showDownloadBtn();
+}
+
+function showDownloadBtn() {
+  document.getElementById('downloadMapBtn').classList.add('visible');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  populateDropdowns();
+  document.getElementById('landUseSelect').addEventListener('change', function() {
+    document.getElementById('zoneSelect').value = '';
+    searchByLandUse();
+  });
+  document.getElementById('zoneSelect').addEventListener('change', function() {
+    document.getElementById('landUseSelect').value = '';
+    searchByZone();
+  });
+  // Allow Enter key in address box
+  document.getElementById('addressInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') geocodeAddress();
+  });
+});
+</script>
+
+<!-- ══════════════════════════════════════════════
+     MAP MODULE
+══════════════════════════════════════════════ -->
+<script type="module">
+  import WebMap        from "https://js.arcgis.com/4.30/@arcgis/core/WebMap.js";
+  import MapView       from "https://js.arcgis.com/4.30/@arcgis/core/views/MapView.js";
+  import Legend        from "https://js.arcgis.com/4.30/@arcgis/core/widgets/Legend.js";
+  import Search        from "https://js.arcgis.com/4.30/@arcgis/core/widgets/Search.js";
+  import Locator       from "https://js.arcgis.com/4.30/@arcgis/core/tasks/Locator.js";
+  import Point         from "https://js.arcgis.com/4.30/@arcgis/core/geometry/Point.js";
+  import Graphic       from "https://js.arcgis.com/4.30/@arcgis/core/Graphic.js";
+  import GraphicsLayer from "https://js.arcgis.com/4.30/@arcgis/core/layers/GraphicsLayer.js";
+  import UniqueValueRenderer from "https://js.arcgis.com/4.30/@arcgis/core/renderers/UniqueValueRenderer.js";
+
+  const WEBMAP_ID  = "fed3b55fe5bf4220b0e74608433eec19";
+  const ZONE_FIELD = "Zoning8";
+  const APN_FIELD  = "APN";
+
+  const LU_SELECT = document.getElementById("landUseSelect");
+  const ZD_SELECT = document.getElementById("zoneSelect");
+  const statusEl  = document.getElementById("map-status");
+
+  const params = new URLSearchParams(location.search);
+  let FILTER_MODE = params.get("mode") === "filter";
+  const EXCLUDED_EFFECT = "grayscale(80%) opacity(35%)";
+
+  const COLORS = {
+    permitted:   [30,126,52,0.4],
+    conditional: [176,86,0,0.4],
+    accessory:   [111,66,193,0.35],
+    zoneOnly:    [59,130,246,0.30],
+    outline:     [48,48,48,1]
+  };
+
+  const zoningData         = window.zoningData || {};
+  const normalizePermission = window.normalizePermission || (()=>"permitted");
+
+  const sql      = s => String(s).replaceAll("'","''");
+  const setParams = obj => {
+    const u = new URL(location.href);
+    Object.entries(obj).forEach(([k,v]) => {
+      if (v === null || v === undefined || v === "") u.searchParams.delete(k);
+      else u.searchParams.set(k, v);
+    });
+    history.replaceState({}, "", u.toString());
+  };
+
+  function zonesForLandUse(lu) {
+    const out = { permitted: [], conditional: [], accessory: [] };
+    const row = zoningData[lu] || {};
+    for (const [zone, perm] of Object.entries(row)) {
+      if (!zone) continue;
+      const kind = normalizePermission(perm);
+      if      (kind === "conditional")  out.conditional.push(zone);
+      else if (kind === "accessory")    out.accessory.push(zone);
+      else if (kind !== "not-permitted") out.permitted.push(zone);
+    }
+    return out;
+  }
+
+  const uvRendererBuckets = (permitted, conditional, accessory) =>
+    new UniqueValueRenderer({
+      field: ZONE_FIELD,
+      defaultSymbol: { type:"simple-fill", color:[0,0,0,0], outline:{ type:"simple-line", color:COLORS.outline, width:0.25 } },
+      uniqueValueInfos: [
+        ...permitted.map(v  => ({ value:v, label:"Permitted",               symbol:{ type:"simple-fill", color:COLORS.permitted,   outline:{ type:"simple-line", color:COLORS.outline, width:.5 } } })),
+        ...conditional.map(v => ({ value:v, label:"Conditional Use Permit", symbol:{ type:"simple-fill", color:COLORS.conditional, outline:{ type:"simple-line", color:COLORS.outline, width:.5 } } })),
+        ...accessory.map(v  => ({ value:v, label:"Accessory Use",           symbol:{ type:"simple-fill", color:COLORS.accessory,   outline:{ type:"simple-line", color:COLORS.outline, width:.5 } } }))
+      ]
+    });
+
+  const uvRendererZoneOnly = zone =>
+    new UniqueValueRenderer({
+      field: ZONE_FIELD,
+      uniqueValueInfos: [{ value:zone, label:zone, symbol:{ type:"simple-fill", color:COLORS.zoneOnly, outline:{ type:"simple-line", color:COLORS.outline, width:.75 } } }],
+      defaultSymbol: { type:"simple-fill", color:[0,0,0,0] }
+    });
+
+  // Pin graphic layer for address search results
+  const pinLayer = new GraphicsLayer({ title: "Address Pin" });
+
+  const webmap   = new WebMap({ portalItem: { id: WEBMAP_ID } });
+  const view     = new MapView({ map: webmap, container: "viewDiv", constraints:{ snapToZoom:false } });
+
+  webmap.add(pinLayer);
+
+  view.ui.add(new Legend({ view }), "bottom-right");
+
+  // Built-in ArcGIS Search widget (kept for power users; positioned top-right)
+  const arcSearch = new Search({ view, includeDefaultSources: true });
+  view.ui.add(arcSearch, "top-right");
+
+  // Locator for our custom address toolbar
+  const locator = new Locator({ url: "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer" });
+
+  // ── Address lookup (called from global scope) ──
+  window.geocodeAddress = async function() {
+    const raw = document.getElementById('addressInput').value.trim();
+    if (!raw) return;
+    statusEl.textContent = window.t ? window.t('addr_searching') : "Searching…";
+    pinLayer.removeAll();
+    try {
+      const address = raw.toLowerCase().includes('petaluma') ? raw : raw + ", Petaluma, CA";
+      const result = await locator.addressToLocations({
+        address: { SingleLine: address },
+        maxLocations: 1,
+        outSpatialReference: view.spatialReference
+      });
+      if (!result.length) {
+        statusEl.textContent = window.t ? window.t('addr_not_found') : "Address not found.";
+        return;
+      }
+      const loc = result[0];
+      const pt  = new Point({ x: loc.location.x, y: loc.location.y, spatialReference: view.spatialReference });
+      const pin = new Graphic({
+        geometry: pt,
+        symbol: {
+          type: "simple-marker",
+          style: "pin",
+          color: [231, 76, 60],
+          size: "24px",
+          outline: { color: [255,255,255], width: 2 }
+        },
+        popupTemplate: {
+          title: "📍 {addr}",
+          content: loc.address
+        },
+        attributes: { addr: loc.address }
+      });
+      pinLayer.add(pin);
+      await view.goTo({ target: pt, zoom: 17 }, { duration: 600 }).catch(()=>{});
+      view.popup.open({ features: [pin], location: pt });
+      statusEl.textContent = "";
+    } catch(e) {
+      console.error(e);
+      statusEl.textContent = window.t ? window.t('addr_error') : "Error. Please try again.";
+    }
+  };
+
+  // ── PDF / Screenshot export (called from global scope) ──
+  window.exportMapPDF = async function() {
+    statusEl.textContent = window.t ? window.t('export_generating') : "Generating PDF…";
+    try {
+      // takeScreenshot returns a PNG; we wrap it in a minimal PDF using a data URI trick
+      const screenshot = await view.takeScreenshot({ format: "png", quality: 95, width: 1400, height: 900 });
+
+      // Build a printable HTML page and open it so the browser's Print → Save as PDF works
+      const lu   = document.getElementById('landUseSelect').value;
+      const zd   = document.getElementById('zoneSelect').value;
+      const title = lu ? `Zoning Map – ${lu}` : zd ? `Zoning Map – ${zd} Zone` : "Zoning Map – Petaluma";
+
+      const win = window.open('', '_blank');
+      if (!win) { statusEl.textContent = window.t ? window.t('export_error') : "Popup blocked."; return; }
+
+      win.document.write(`<!DOCTYPE html>
+<html><head>
+  <meta charset="UTF-8">
+  <title>${title}</title>
+  <style>
+    body { margin:0; font-family: 'Segoe UI', sans-serif; background:#fff; }
+    .page { width:100%; max-width:1100px; margin:0 auto; padding:24px; }
+    h1 { font-size:1.5em; color:#2c3e50; margin-bottom:6px; }
+    .meta { font-size:0.85em; color:#7f8c8d; margin-bottom:16px; }
+    img { width:100%; border:1px solid #dee2e6; border-radius:6px; }
+    .legend { margin-top:16px; display:flex; gap:20px; flex-wrap:wrap; font-size:0.9em; }
+    .legend-item { display:flex; align-items:center; gap:6px; }
+    .swatch { width:18px; height:18px; border-radius:3px; border:1px solid #aaa; }
+    .disclaimer { margin-top:20px; font-size:0.78em; color:#888; border-top:1px solid #eee; padding-top:12px; }
+    @media print { body { -webkit-print-color-adjust:exact; print-color-adjust:exact; } }
+  </style>
+</head><body>
+<div class="page">
+  <h1>${title}</h1>
+  <div class="meta">City of Petaluma · Exported ${new Date().toLocaleDateString()} · pkaljian.github.io/zoning-lookup-tool/</div>
+  <img src="${screenshot.dataUrl}" alt="Zoning Map">
+  <div class="legend">
+    <div class="legend-item"><div class="swatch" style="background:rgba(30,126,52,0.5)"></div> Permitted</div>
+    <div class="legend-item"><div class="swatch" style="background:rgba(176,86,0,0.5)"></div> Conditional Use Permit</div>
+    <div class="legend-item"><div class="swatch" style="background:rgba(111,66,193,0.45)"></div> Accessory Use</div>
+    <div class="legend-item"><div class="swatch" style="background:rgba(59,130,246,0.4)"></div> Selected Zone</div>
+  </div>
+  <div class="disclaimer">⚠️ This map is for general reference only. Verify all zoning information with the City of Petaluma Planning Department before making development decisions.</div>
+</div>
+<script>window.onload = () => window.print();<\/script>
+</body></html>`);
+      win.document.close();
+      statusEl.textContent = window.t ? window.t('export_done') : "Map exported.";
+      setTimeout(() => { statusEl.textContent = ""; }, 3000);
+    } catch(e) {
+      console.error(e);
+      statusEl.textContent = window.t ? window.t('export_error') : "Export failed.";
+    }
+  };
+
+  // ── Expose t() to global so export fn can use it ──
+  window.t = window.t || function(k) { return k; };
+
+  let layer, layerView;
+  const zoomWhere = async w => {
+    const { extent } = await layer.queryExtent({ where: w });
+    if (extent) await view.goTo({ target: extent.expand(1.1) }, { duration: 500 }).catch(()=>{});
+  };
+
+  async function applyLUFromMain() {
+    const lu = LU_SELECT?.value || "";
+    setParams({ lu, zd: null });
+    if (!lu) { layer.renderer=null; if(layerView){layerView.filter=null; layerView.effect=null;} layer.definitionExpression=""; return; }
+    const sets = zonesForLandUse(lu);
+    const all  = [...new Set([...sets.permitted, ...sets.conditional, ...sets.accessory])];
+    const where = all.length ? `${ZONE_FIELD} IN (${all.map(v=>`'${sql(v)}'`).join(",")})` : "1=0";
+    if (FILTER_MODE) {
+      layer.definitionExpression = all.length ? where : "";
+      if(layerView){layerView.filter=null;layerView.effect=null;}
+    } else {
+      layer.definitionExpression = "";
+      if(layerView){ layerView.filter = all.length ? { where } : null; layerView.effect = layerView.filter ? { filter:layerView.filter, excludedEffect:EXCLUDED_EFFECT } : null; }
+    }
+    layer.renderer = uvRendererBuckets(sets.permitted, sets.conditional, sets.accessory);
+    if (all.length) await zoomWhere(where);
+  }
+
+  async function applyZDFromMain() {
+    const zd = ZD_SELECT?.value || "";
+    setParams({ zd, lu: null });
+    if (!zd) { layer.renderer=null; if(layerView){layerView.filter=null;layerView.effect=null;} layer.definitionExpression=""; return; }
+    const where = `${ZONE_FIELD}='${sql(zd)}'`;
+    if (FILTER_MODE) {
+      layer.definitionExpression = where; if(layerView){layerView.filter=null;layerView.effect=null;}
+    } else {
+      layer.definitionExpression=""; if(layerView){ layerView.filter={where}; layerView.effect={filter:{where},excludedEffect:EXCLUDED_EFFECT}; }
+    }
+    layer.renderer = uvRendererZoneOnly(zd);
+    await zoomWhere(where);
+  }
+
+  view.on("click", async event => {
+    if (!layer) return;
+    const hit = await view.hitTest(event, { include:[layer] });
+    const g   = hit?.results?.[0]?.graphic;
+    if (!g) return;
+    const apnVal = g.attributes?.[APN_FIELD];
+    if (apnVal != null && apnVal !== "") setParams({ apn: String(apnVal) });
+    view.popup.open({ features:[g], location:event.mapPoint });
+  });
+
+  async function restoreAPNFromURL() {
+    const apn = new URLSearchParams(location.search).get("apn");
+    if (!apn) return;
+    const q = layer.createQuery();
+    q.where = `${APN_FIELD}='${sql(apn)}'`;
+    q.returnGeometry=true; q.outFields=["*"];
+    const res = await layer.queryFeatures(q);
+    if (res.features.length) {
+      const f = res.features[0];
+      await view.goTo({ target:f.geometry.extent?.expand(1.2)||f.geometry }, {duration:500}).catch(()=>{});
+      view.popup.open({ features:[f], location:f.geometry.centroid||f.geometry.extent?.center });
+    }
+  }
+
+  view.when(async () => {
+    try {
+      await webmap.when();
+      if (typeof webmap.loadAll === "function") await webmap.loadAll();
+
+      async function resolveTargetLayer() {
+        const all = webmap.allLayers.toArray();
+        for (const lyr of all) {
+          try {
+            if (lyr.type !== "feature") continue;
+            if (typeof lyr.load === "function") await lyr.load();
+            const fields = (lyr.fields || []).map(f=>(f.name||"").toLowerCase());
+            if (fields.includes(ZONE_FIELD.toLowerCase())) return lyr;
+          } catch(e) { console.warn("[Map] Skip:", lyr?.title, e); }
+        }
+        return null;
+      }
+
+      layer = await resolveTargetLayer();
+      if (!layer) {
+        console.error("[Map] Layer with field", ZONE_FIELD, "not found.");
+        document.getElementById("viewDiv").innerHTML = `<div style='padding:12px;color:#b00'>Map layer not found.</div>`;
+        return;
+      }
+
+      layerView = await view.whenLayerView(layer);
+      const SUPPORTS_EFFECT = "effect" in layerView && "filter" in layerView;
+      if (!SUPPORTS_EFFECT && !FILTER_MODE) { console.warn("[Map] No effect support; switching to filter mode."); FILTER_MODE = true; }
+
+      LU_SELECT?.addEventListener("change", applyLUFromMain);
+      ZD_SELECT?.addEventListener("change", applyZDFromMain);
+
+      const p = new URLSearchParams(location.search);
+      if (p.get("mode")==="filter") FILTER_MODE = true;
+      if (p.get("zd"))      { ZD_SELECT && (ZD_SELECT.value = p.get("zd")); await applyZDFromMain(); }
+      else if (p.get("lu")) { LU_SELECT && (LU_SELECT.value = p.get("lu")); await applyLUFromMain(); }
+
+      await restoreAPNFromURL();
+    } catch(err) {
+      console.error("[Map] Fatal:", err);
+      document.getElementById("viewDiv").innerHTML = `<div style='padding:12px;color:#b00'>Map failed to load.</div>`;
+    }
+  });
+</script>
+
+</body>
+</html>
